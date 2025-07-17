@@ -476,12 +476,15 @@ const updateStatusTrack = async (pickupId: string, newStatus: string) => {
                 <Text style={styles.cardType}>{item?.type}</Text>
                 <Text style={styles.cardPoints}>{item?.points} Points</Text>
                 <Text style={styles.cardType}>Quantity: {item.quantity || 0}</Text>
-                <TouchableOpacity
-                  style={{ marginTop: 8, backgroundColor: '#00796b', padding: 8, borderRadius: 6, alignSelf: 'flex-start' }}
-                  onPress={() => openEditQuantityModal(item)}
-                >
-                  <Text style={{ color: 'white', fontWeight: 'bold' }}>Ubah Quantity</Text>
-                </TouchableOpacity>
+                {/* Tampilkan tombol Ubah Quantity hanya jika status penyetoran sudah Ditimbang */}
+                {pickupData.status === "Ditimbang" && (
+                  <TouchableOpacity
+                    style={{ marginTop: 8, backgroundColor: '#00796b', padding: 8, borderRadius: 6, alignSelf: 'flex-start' }}
+                    onPress={() => openEditQuantityModal(item)}
+                  >
+                    <Text style={{ color: 'white', fontWeight: 'bold' }}>Ubah Quantity</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           ))
