@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"; 
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,16 +8,23 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { getAuth } from "firebase/auth";
-import { RootStackParamList } from "../types"; 
-import { getFirestore, collection, query, where, onSnapshot } from "firebase/firestore";
-import { Ionicons } from '@expo/vector-icons';
-import SelesaiScreen from './SelesaiScreen';
-import DibatalkanScreen from './DibatalkanScreen';
-import DijemputScreen from './DijemputScreen';
-import CONFIG from './../config';
+import { RootStackParamList } from "../../utils/types";
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  onSnapshot,
+} from "firebase/firestore";
+import { Ionicons } from "@expo/vector-icons";
+import SelesaiScreen from "./SelesaiScreen";
+import DibatalkanScreen from "./DibatalkanScreen";
+import DijemputScreen from "./DijemputScreen";
+import CONFIG from "../config";
+import searchingImage from "../../assets/images/pickup/searching.png";
 
 const db = getFirestore();
 
@@ -32,6 +39,7 @@ interface PickupItem {
 
 // Pemetaan gambar lokal
 const imageMapping: { [key: string]: any } = {
+  "default-sampah.png": require("../../assets/images/default-sampah.png"),
   "monitor-lcd.jpg": require("../../assets/images/elektronik/monitor-lcd.jpg"),
   "monitor-tabung.jpg": require("../../assets/images/elektronik/monitor-tabung.jpg"),
   "botol_kaca.png": require("../../assets/images/kaca/botol_kaca.png"),
@@ -49,7 +57,6 @@ const imageMapping: { [key: string]: any } = {
   "botol_plastik.png": require("../../assets/images/plastik/botol_plastik.png"),
   "ember_plastik.png": require("../../assets/images/plastik/ember_plastik.png"),
   "gelas_plastik.png": require("../../assets/images/plastik/gelas_plastik.png"),
-  'default-sampah': require('../../assets/images/default-sampah.png'),
 };
 
 const getImageSource = (imageName: string) => {
@@ -60,7 +67,8 @@ export default function PickUpScreen() {
   const [activeTab, setActiveTab] = useState("Diproses");
   const [loading, setLoading] = useState(true);
   const [pickupData, setPickupData] = useState<any[]>([]);
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   useEffect(() => {
     const user = getAuth().currentUser;
@@ -70,7 +78,7 @@ export default function PickUpScreen() {
       const q = query(collectionRef, where("userId", "==", userId));
 
       const unsubscribe = onSnapshot(q, (snapshot) => {
-        const data = snapshot.docs.map(doc => ({
+        const data = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
@@ -83,33 +91,31 @@ export default function PickUpScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    // Konfigurasi tombol back
-    navigation.setOptions({
-      headerLeft: () => (
-        <TouchableOpacity
-          onPress={() => navigation.navigate('MainTabs')}
-          style={{ marginLeft: 10 }}
-        >
-          <Ionicons name="arrow-back" size={24} color="#25C05D" />
-        </TouchableOpacity>
-      ),
-    });
-  }, [navigation]);
-
   const filterDataByStatus = (status: string) => {
-    return pickupData.filter(item => item.status === status);
+    return pickupData.filter((item) => item.status === status);
   };
 
   const renderTabContent = () => {
     if (activeTab === "Selesai") {
-      // Render komponen khusus untuk tab "Selesai"
       return <SelesaiScreen />;
     } else if (activeTab === "Dijemput") {
-      // Render komponen khusus untuk tab "Selesai"
+      // Jika data kosong di Dijemput
+      const filteredData = filterDataByStatus("Dijemput");
+      if (!filteredData || filteredData.length === 0) {
+        return (
+          <View style={styles.emptyContainer}>
+            <Image
+              source={searchingImage}
+              style={styles.emptyImage}
+              resizeMode="contain"
+            />
+            <Text style={styles.placeholderText}>Belum ada penjemputan</Text>
+          </View>
+        );
+      }
       return <DijemputScreen />;
     }
-  
+
     let filteredData = [];
     if (activeTab === "Diproses") {
       filteredData = filterDataByStatus("Pending");
@@ -118,82 +124,155 @@ export default function PickUpScreen() {
     } else if (activeTab === "Ditimbang") {
       filteredData = filterDataByStatus("Ditimbang");
     }
-  
+
+    if (
+      activeTab === "Diproses" &&
+      (!filteredData || filteredData.length === 0)
+    ) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Image
+            source={searchingImage}
+            style={styles.emptyImage}
+            resizeMode="contain"
+          />
+          <Text style={styles.placeholderText}>Belum terdapat pengajuan</Text>
+          <Text style={styles.placeholderSubText}>
+            Silahkan melakukan pengajuan pick up
+          </Text>
+        </View>
+      );
+    }
     if (filteredData.length === 0) {
-      return <Text style={styles.placeholderText}>Tidak ada data di tab {activeTab}.</Text>;
+      return (
+        <Text style={styles.placeholderText}>
+          Tidak ada data di tab {activeTab}.
+        </Text>
+      );
     }
 
-    return filteredData.map((item, index) => (
-      <View style={styles.contentContainer} key={index}>
-        <Text style={styles.sectionTitle}>{activeTab}</Text>
-        <View style={styles.cardContainer}>
-          {item.items && item.items.map((subItem: PickupItem, idx: number) => {
-            const pointUnit = subItem.type === "Non-organik-elektronik" ? "/ unit" : "/ Kg";
-            return (
-              <View style={styles.card} key={idx}>
-                <Image
-                  source={getImageSource(subItem.image)}
-                  style={styles.cardImage}
-                />
-                <View style={styles.cardDetails}>
-                  <Text style={styles.cardTitle}>{subItem.name || "Tidak diketahui"}</Text>
-                  <Text style={styles.cardSubtitle}>{subItem.type || "Jenis tidak diketahui"}</Text>
-                  <Text style={styles.cardPoints}>{subItem.points || 0} Poin {pointUnit}</Text>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-        <View style={styles.detailInfoContainer}>
-          <Text style={styles.infoText}>
-            <Text style={{ fontWeight: "bold" }}>Total Sampah: </Text>
-            {item.items ? item.items.length : 0} Sampah
-          </Text>
-          <Text style={styles.infoText}>
-            <Text style={{ fontWeight: "bold" }}>Sampah akan dijemput pada: </Text>
-            {item.pickUpDate
-              ? new Date(item.pickUpDate).toLocaleString("id-ID", {
-                  day: "2-digit",
-                  month: "long",
-                  year: "numeric",
-                }) + ' pukul 15:00'
-              : "Tanggal tidak tersedia"}
-          </Text>
-          <TouchableOpacity
-              style={styles.detailButton}
-              onPress={() => {
-                const itemId = item.items[0]?.itemId;
-                console.log('Navigating to Rincian with:', { id: itemId, pickupId: item.id });
-                if (itemId) {
-                  navigation.navigate('Rincian', { id: itemId, pickupId: item.id });
-                } else {
-                  console.log('ItemId tidak ditemukan');
-                }
-              }}
-            >
-            <Text style={styles.detailButtonText}>Lihat Rincian</Text>
+    return (
+      <>
+        {filteredData.map((item, index) => (
+          <View style={styles.contentContainer} key={index}>
+            {/* Note Perlu Dijemput di dalam card, hanya untuk Diproses */}
+            {activeTab === "Diproses" && (
+              <Text style={styles.notePerluDijemputCard}>Perlu Dijemput</Text>
+            )}
+            <View style={styles.cardContainer}>
+              {item.items &&
+                item.items.map((subItem: PickupItem, idx: number) => {
+                  const pointUnit =
+                    subItem.type === "Non-organik-elektronik"
+                      ? "/ unit"
+                      : "/ Kg";
+                  return (
+                    <View style={styles.card} key={idx}>
+                      <Image
+                        source={getImageSource(subItem.image)}
+                        style={styles.cardImage}
+                      />
+                      <View style={styles.cardDetails}>
+                        <Text style={styles.cardTitle}>
+                          {subItem.name || "Tidak diketahui"}
+                        </Text>
+                        <Text style={styles.cardSubtitle}>
+                          {subItem.type || "Jenis tidak diketahui"}
+                        </Text>
+                        <Text style={styles.cardPoints}>
+                          {subItem.points || 0} Poin {pointUnit}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
+            </View>
+            <View style={styles.detailInfoContainer}>
+              <Text style={styles.infoText}>
+                <Text style={{ fontWeight: "bold" }}>Total Sampah: </Text>
+                {item.items ? item.items.length : 0} Sampah
+              </Text>
+              <Text style={styles.infoText}>
+                <Text style={{ fontWeight: "bold" }}>
+                  Sampah akan dijemput pada:{" "}
+                </Text>
+                {item.pickUpDate
+                  ? new Date(item.pickUpDate).toLocaleString("id-ID", {
+                      day: "2-digit",
+                      month: "long",
+                      year: "numeric",
+                    }) + " pukul 15:00"
+                  : "Tanggal tidak tersedia"}
+              </Text>
+              <TouchableOpacity
+            style={styles.detailButton}
+           onPress={() => {
+              if (!item.items || item.items.length === 0) {
+                alert("Tidak ada item sampah pada penyetoran ini.");
+                return;
+              }
+              const itemId = item.items[0]?.itemId || item.items[0]?.id;
+              if (!itemId) {
+                alert("ID item tidak ditemukan pada data sampah.");
+                return;
+              }
+              navigation.navigate("Rincian", {
+               id: itemId,
+                pickupId: item.id,
+              });
+           }}
+          >
+           <Text style={styles.detailButtonText}>Lihat Rincian</Text>
           </TouchableOpacity>
 
-          <Text style={styles.infoText}>
-            <Text style={{ fontWeight: "bold" }}>No. Antrean: </Text>
-            {item.queueNumber || "Tidak tersedia"}
-          </Text>
-        </View>
-      </View>
-    ));
+              <Text style={styles.infoText}>
+                <Text style={{ fontWeight: "bold" }}>No. Antrean: </Text>
+                {item.queueNumber || "Tidak tersedia"}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </>
+    );
   };
+
   return (
     <View style={styles.container}>
-      <View style={styles.tabs}>
-        {["Diproses", "Dijemput", "Ditimbang", "Selesai", "Dibatalkan"].map((tab) => (
-          <TouchableOpacity key={tab} onPress={() => setActiveTab(tab)}>
-            <Text style={[styles.tabText, activeTab === tab && styles.activeTab]}>
-              {tab}
-            </Text>
+      {/* Header custom hijau */}
+      <View style={styles.headerContainer}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('MainTabs')}
+            style={styles.backButton}
+            activeOpacity={0.7}
+            hitSlop={{ top: 12, left: 12, right: 12, bottom: 12 }}
+          >
+            <Ionicons name="arrow-back" size={28} color="#fff" />
           </TouchableOpacity>
-        ))}
+          <View style={styles.headerTitleWrapper}>
+            <Text style={styles.headerTitle}>Pick Up</Text>
+          </View>
+          {/* Spacer agar headerTitle tetap center */}
+          <View style={{ width: 40 }} />
+        </View>
       </View>
-
+      <View style={styles.tabs}>
+        {["Diproses", "Dijemput", "Ditimbang", "Selesai", "Dibatalkan"].map(
+          (tab) => (
+            <TouchableOpacity
+              key={tab}
+              onPress={() => setActiveTab(tab)}
+              style={styles.tabButton}
+            >
+              <Text
+                style={[styles.tabText, activeTab === tab && styles.activeTab]}
+              >
+                {tab}
+              </Text>
+            </TouchableOpacity>
+          )
+        )}
+      </View>
       <ScrollView contentContainerStyle={styles.content}>
         {loading ? (
           <ActivityIndicator size="large" color="#25C05D" />
@@ -213,7 +292,7 @@ const styles = StyleSheet.create({
   tabs: {
     flexDirection: "row",
     justifyContent: "space-around",
-    backgroundColor: "white",
+    backgroundColor: "transparent",
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
@@ -323,9 +402,81 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   placeholderText: {
-    fontSize: 14,
-    color: "#9E9E9E",
+    fontSize: 20,
+    color: "#222",
+    fontWeight: "bold",
     textAlign: "center",
     marginTop: 16,
+    marginBottom: 2,
+  },
+  placeholderSubText: {
+    fontSize: 13,
+    color: "#A0A0A0",
+    textAlign: "center",
+    marginTop: 2,
+  },
+  headerContainer: {
+    backgroundColor: "#25C05D",
+    paddingTop: 40,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    elevation: 4,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backButton: {
+    marginRight: 12,
+    padding: 8,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTitleWrapper: {
+    flex: 1,
+    alignItems: "center",
+  },
+  headerTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  notePerluDijemput: {
+    fontSize: 16,
+    color: "#25C05D",
+    fontWeight: "bold",
+    marginBottom: 12,
+    marginTop: 8,
+    marginLeft: 4,
+  },
+  notePerluDijemputCard: {
+    fontSize: 16,
+    color: "#25C05D",
+    fontWeight: "bold",
+    marginBottom: 8,
+    marginTop: 0,
+    marginLeft: 0,
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 40,
+  },
+  emptyImage: {
+    width: 180,
+    height: 180,
+    marginBottom: 16,
+    opacity: 0.8,
   },
 });

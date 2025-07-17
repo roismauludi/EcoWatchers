@@ -1,5 +1,5 @@
 import React from 'react';
-import { SelectedItemsProvider } from './context/SelectedItemsContext'; // Path to context file
+import { SelectedItemsProvider } from "../../context/SelectedItemsContext";// Path to context file
 import CatalogScreen from '../screens/CatalogScreen'; // Your CatalogScreen
 import TongScreen from '../(tabs)/TongSampah'; // Your TongScreen
 

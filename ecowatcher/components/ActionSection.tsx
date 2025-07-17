@@ -8,12 +8,12 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { StackNavigationProp } from "@react-navigation/stack";
-import { RootStackParamList } from "../app/types"; // Ensure this import is correct
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from "../utils/types";
 
-type ActionSectionNavigationProp = StackNavigationProp<
+type ActionSectionNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
-  "Dashboard"
+  "MainTabs"
 >;
 
 const { width } = Dimensions.get("window");
@@ -23,45 +23,22 @@ const ActionSection = () => {
 
   return (
     <View style={styles.actions}>
-      <TouchableOpacity
-        style={styles.actionButton}
-        onPress={() => navigation.navigate("Catalog")}
-      >
-        <View style={styles.iconContainer}>
-          <Ionicons name="book-outline" size={30} color="#4CAF50" />
-        </View>
-        <Text style={styles.actionText}>Katalog</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.actionButton}
-        onPress={() => navigation.navigate("DropPoint")}
-      >
-        <View style={styles.iconContainer}>
-          <Ionicons name="location-outline" size={30} color="#4CAF50" />
-        </View>
-        <Text style={styles.actionText}>Drop Point</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.actionButton}
-        onPress={() => navigation.navigate("PickUp")}
-      >
-        <View style={styles.iconContainer}>
-          <Ionicons name="car-outline" size={30} color="#4CAF50" />
-        </View>
-        <Text style={styles.actionText}>Pick Up</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.actionButton}
-        onPress={() => navigation.navigate("Education")}
-      >
-        <View style={styles.iconContainer}>
-          <Ionicons name="book-outline" size={30} color="#4CAF50" />
-        </View>
-        <Text style={styles.actionText}>Edukasi</Text>
-      </TouchableOpacity>
+      {[
+        { icon: "book-outline", label: "Katalog", route: "Catalog" },
+        { icon: "car-outline", label: "Pick Up", route: "PickUp" },
+        { icon: "information-outline", label: "Channels", route: "Channels" },
+      ].map((item, index) => (
+        <TouchableOpacity
+          key={index}
+          style={styles.actionButton}
+          onPress={() => navigation.navigate(item.route)}
+        >
+          <View style={styles.iconContainer}>
+            <Ionicons name={item.icon as any} size={26} color="#4CAF50" />
+          </View>
+          <Text style={styles.actionText}>{item.label}</Text>
+        </TouchableOpacity>
+      ))}
     </View>
   );
 };
@@ -69,31 +46,31 @@ const ActionSection = () => {
 const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "space-between",
     alignItems: "center",
-    marginHorizontal: 20,
+    marginHorizontal: 10,
     marginBottom: 20,
     backgroundColor: "#F8F8F8",
-    paddingVertical: 20,
-    borderRadius: 10,
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    borderRadius: 12,
   },
   actionButton: {
-    backgroundColor: "#EAF7EF",
-    padding: 10,
-    borderRadius: 12,
+    flex: 1,
     alignItems: "center",
-    width: (width - 80) / 4, // 4 equal buttons based on screen width
+    paddingHorizontal: 5,
   },
   iconContainer: {
-    backgroundColor: "#E0F2E9", // light background for the icon
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 10,
+    backgroundColor: "#E0F2E9",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 6,
   },
   actionText: {
     color: "#4CAF50",
     fontSize: 12,
     fontWeight: "500",
+    textAlign: "center",
   },
 });
 

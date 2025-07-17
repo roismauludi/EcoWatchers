@@ -10,9 +10,9 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../types";
+import { RootStackParamList } from "../../utils/types";
 import { getAuth } from "firebase/auth";
-import CONFIG from "./../config";
+import CONFIG from "../config";
 import { useFocusEffect } from '@react-navigation/native';
 
 type Item = {
@@ -44,7 +44,7 @@ const imageMapping: { [key: string]: any } = {
   "botol_plastik.png": require("../../assets/images/plastik/botol_plastik.png"),
   "ember_plastik.png": require("../../assets/images/plastik/ember_plastik.png"),
   "gelas_plastik.png": require("../../assets/images/plastik/gelas_plastik.png"),
-  'default-sampah': require('../../assets/images/default-sampah.png'),
+  "default-sampah.png": require("../../assets/images/default-sampah.png"),
 };
 
 const getImageSource = (imageName: string) => {

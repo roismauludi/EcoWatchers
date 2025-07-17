@@ -1,10 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useRoute } from '@react-navigation/native';
-import CONFIG from './../config';
+import CONFIG from '../config';
 import moment from 'moment';
 import { RouteProp } from '@react-navigation/native';
-import { RootStackParamList } from '../types';
+import { RootStackParamList } from '../../utils/types';
 
 type PickupDetails = {
   queueNumber: string;

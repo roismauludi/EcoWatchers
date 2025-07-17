@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { getAuth, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { Ionicons, AntDesign } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 const SecurityScreen = () => {
+  const navigation = useNavigation();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -85,6 +87,14 @@ const SecurityScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
+      {/* Header dengan tombol back dan judul */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, marginBottom: 10, marginLeft: 8 }}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4, marginRight: 8 }}>
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#333' }}>Pengaturan Keamanan</Text>
+      </View>
+      {/* Konten form */}
       <View style={styles.formGroup}>
         <Text style={styles.label}>Password Lama</Text>
         <View style={styles.inputWrapper}>

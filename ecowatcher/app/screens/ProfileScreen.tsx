@@ -114,7 +114,7 @@ const ProfileScreen = () => {
    
   
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 80 }}>
       {/* Header dengan gambar profil dan info pengguna */}
       <LinearGradient colors={["#2ECC71", "#27AE60"]} style={styles.header}>
         <View style={styles.profileContainer}>
@@ -183,13 +183,13 @@ const ProfileScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Tombol Keluar */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutText}>Keluar</Text>
-      </TouchableOpacity>
-
-      {/* Versi Aplikasi */}
-      <Text style={styles.versionText}>Versi Aplikasi 1.0.0</Text>
+      {/* Tombol Keluar dan Versi Aplikasi */}
+      <View style={{alignItems: 'center', marginHorizontal: 16, marginTop: 24}}>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Text style={styles.logoutText}>Keluar</Text>
+        </TouchableOpacity>
+        <Text style={styles.versionText}>Versi Aplikasi 1.0.0</Text>
+      </View>
     </ScrollView>
   );
 };
@@ -290,11 +290,13 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     backgroundColor: "#E74C3C",
-    marginHorizontal: 15,
-    marginTop: 15,
-    paddingVertical: 15,
-    borderRadius: 10,
+    padding: 12,
+    borderRadius: 8,
     alignItems: "center",
+    width: '100%',
+    // marginHorizontal: 16, // dipindah ke View luar
+    // marginTop: 24, // dipindah ke View luar
+    // marginBottom: 80, // dihapus agar tidak mendorong versi aplikasi ke bawah
   },
   logoutText: {
     color: "white",
@@ -304,7 +306,7 @@ const styles = StyleSheet.create({
   versionText: {
     textAlign: "center",
     color: "#888",
-    marginVertical: 15,
+    marginTop: 12,
     fontSize: 12,
   },
 });

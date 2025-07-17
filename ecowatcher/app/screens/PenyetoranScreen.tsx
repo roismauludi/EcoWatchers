@@ -11,6 +11,7 @@ import {
   RefreshControl,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Calendar } from "react-native-calendars";
 import { getAuth } from "firebase/auth"; 
@@ -18,14 +19,22 @@ import { DateData } from "react-native-calendars";
 import moment from "moment";
 import 'moment/locale/id'; // Import Indonesian locale
 import * as ImagePicker from 'expo-image-picker';
-import CONFIG from './../config';
+import CONFIG from '../config';
+import { SafeAreaView } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from '@react-navigation/native';
 
 type RootStackParamList = {
   PickUp: undefined;
   AddAddress: undefined;
+  DaftarAlamat: undefined;
+  Penyetoran: { selectedAddress?: any; items?: any[] } | undefined;
+  Tong: undefined;
+  Catalog: { onSelectItem: (item: any) => void } | undefined;
 };
 
 const imageMapping: { [key: string]: any } = {
+  "default-sampah.png": require("../../assets/images/default-sampah.png"),
   "monitor-lcd.jpg": require("../../assets/images/elektronik/monitor-lcd.jpg"),
   "monitor-tabung.jpg": require("../../assets/images/elektronik/monitor-tabung.jpg"),
   "botol_kaca.png": require("../../assets/images/kaca/botol_kaca.png"),
@@ -53,6 +62,7 @@ const getImageSource = (imageName: string) => {
 
 export default function PenyetoranScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute();
 
   // State untuk kontrol modal dan tanggal yang dipilih
   const [modalVisible, setModalVisible] = useState(false);
@@ -67,6 +77,61 @@ export default function PenyetoranScreen() {
 
   // State untuk menyimpan foto yang diambil
   const [photos, setPhotos] = useState<string[]>([]);
+  const [pickupFee, setPickupFee] = useState<number | null>(null);
+  const [feeKecamatan, setFeeKecamatan] = useState<any>({});
+  const [feeKecamatanLoading, setFeeKecamatanLoading] = useState(false);
+
+  // Update pickupFee setiap kali selectedAddress atau feeKecamatan berubah
+  useEffect(() => {
+    if (selectedAddress && selectedAddress.Kecamatan && feeKecamatan) {
+      // Normalisasi nama kecamatan agar pencocokan tidak sensitif kapital/spasi
+      const kecamatanUser = (selectedAddress.Kecamatan || '').trim().toLowerCase();
+      const mappingKeys = Object.keys(feeKecamatan);
+      const foundKey = mappingKeys.find(
+        k => k.trim().toLowerCase() === kecamatanUser
+      );
+      const fee = foundKey ? Number(feeKecamatan[foundKey]) : 0;
+      setPickupFee(isNaN(fee) ? 0 : fee);
+    } else {
+      setPickupFee(null);
+    }
+  }, [selectedAddress, feeKecamatan]);
+
+  // Update selectedAddress jika ada di route.params
+  useEffect(() => {
+    if (route.params && (route.params as any).selectedAddress) {
+      setSelectedAddress((route.params as any).selectedAddress);
+    }
+  }, [route.params]);
+
+  // Tambahkan useFocusEffect untuk mengambil selectedAddress dari AsyncStorage
+  useFocusEffect(
+    React.useCallback(() => {
+      const getSelectedAddress = async () => {
+        const stored = await AsyncStorage.getItem('selectedAddress');
+        if (stored) {
+          setSelectedAddress(JSON.parse(stored));
+        }
+      };
+      getSelectedAddress();
+    }, [])
+  );
+
+  // Fetch mapping biaya per kecamatan dari API saat mount
+  useEffect(() => {
+    setFeeKecamatanLoading(true);
+    const fetchFeeKecamatan = async () => {
+      try {
+        const res = await fetch(`${CONFIG.API_URL}/api/pickup-fee-kecamatan`);
+        if (res.ok) {
+          const data = await res.json();
+          setFeeKecamatan(data.mapping || {});
+        }
+      } catch {}
+      setFeeKecamatanLoading(false);
+    };
+    fetchFeeKecamatan();
+  }, []);
 
 
   const fetchAddresses = async () => {
@@ -79,7 +144,20 @@ export default function PenyetoranScreen() {
 
         if (response.ok) {
           setAddresses(data);
-          setSelectedAddress(data[0]);
+          // Ambil alamat terpilih dari AsyncStorage
+          const stored = await AsyncStorage.getItem('selectedAddress');
+          if (stored) {
+            const selected = JSON.parse(stored);
+            // Cari di data hasil fetch, jika ada, set sebagai selectedAddress
+            const found = data.find((addr: any) => addr.id === selected.id);
+            if (found) {
+              setSelectedAddress(found);
+            } else {
+              setSelectedAddress(data[0]);
+            }
+          } else {
+            setSelectedAddress(data[0]);
+          }
         } else {
           console.error('No addresses found');
         }
@@ -116,9 +194,31 @@ export default function PenyetoranScreen() {
     moment.locale("id");
     console.log('Locale setelah diatur:', moment().locale()); // Pastikan "id"
 
-    // Fetch addresses and items when the component mounts
+    // Fetch addresses when the component mounts
     fetchAddresses();
-    fetchItems();  // Fetch items from "tong"
+
+    // Ambil items dari navigation jika ada, jika tidak fetch dari server
+    if (route.params && (route.params as any).items) {
+      setItems((route.params as any).items);
+    } else {
+      fetchItems();
+    }
+
+    // Fetch pickup fee
+    const fetchFee = async () => {
+      try {
+        const res = await fetch(`${CONFIG.API_URL}/api/pickup-fee`);
+        if (res.ok) {
+          const data = await res.json();
+          setPickupFee(data.fee);
+        } else {
+          setPickupFee(500);
+        }
+      } catch {
+        setPickupFee(500);
+      }
+    };
+    fetchFee();
   }, []);
 
   const onRefresh = async () => {
@@ -207,41 +307,94 @@ export default function PenyetoranScreen() {
   };
   
   // Fungsi untuk menghapus item setelah penyetoran
-  const handleDeleteItems = async (items: Array<{ itemId: string }>) => {
+  const handleDeleteItems = async (items: Array<{ itemId?: string; id?: string }>) => {
     if (!items || items.length === 0) {
       console.error("Tidak ada item untuk dihapus");
       return;
     }
-  
+
     try {
       // Loop untuk menghapus setiap item berdasarkan ID-nya
       for (const item of items) {
-        if (!item.itemId) { // Pastikan Anda menggunakan itemId
+        const itemId = item.itemId || item.id;
+        if (!itemId) {
           console.error("ID item tidak ditemukan");
           continue; // Skip item yang tidak memiliki ID
         }
-  
-        const response = await fetch(`${CONFIG.API_URL}/api/delete-item/${item.itemId}`, {
+
+        const response = await fetch(`${CONFIG.API_URL}/api/delete-item/${itemId}`, {
           method: "DELETE",
         });
-  
+
         if (response.ok) {
-          console.log(`Item dengan ID ${item.itemId} berhasil dihapus`);
+          console.log(`Item dengan ID ${itemId} berhasil dihapus`);
         } else {
           const result = await response.json();
-          console.error(`Gagal menghapus item dengan ID ${item.itemId}:`, result);
+          console.error(`Gagal menghapus item dengan ID ${itemId}:`, result);
         }
       }
-  
+
       // Setelah semua item dihapus, refresh data yang relevan
       // fetchItems();
     } catch (error) {
       console.error("Terjadi kesalahan saat menghapus item:", error);
     }
   };
+
+  // Fungsi untuk menambah item sampah
+  const handleAddItem = () => {
+    navigation.navigate('Catalog', {
+      onSelectItem: (item: any) => {
+        setItems((prev: any[]) => {
+          // Mapping kategori ke type jika perlu
+          const mapping: Record<string, string> = {
+            Elektronik: "Non-organik-elektronik",
+            Kaca: "Non-organik-kaca",
+            Kertas: "Non-organik-kertas",
+            Logam: "Non-organik-logam",
+            Minyak: "Non-organik-minyak",
+            Plastik: "Non-organik-plastik",
+          };
+          const exist = prev.find(i => (i.id || i.itemId) === (item.id || item.itemId));
+          const type = item.type || mapping[item.category] || "Non-organik-lainnya";
+          const category = item.category || "Tidak Diketahui";
+          if (exist) {
+            return prev.map(i => (i.id || i.itemId) === (item.id || item.itemId)
+              ? { ...i, quantity: (i.quantity || 1) + 1 }
+              : i);
+          } else {
+            return [...prev, { ...item, type, category, quantity: 1 }];
+          }
+        });
+      }
+    });
+  };
+
+  // Fungsi untuk mengubah quantity item
+  const handleChangeItemQuantity = (itemId: string, delta: number) => {
+    setItems((prevItems: any[]) => {
+      return prevItems.reduce((acc: any[], item) => {
+        if (item.id === itemId || item.itemId === itemId) {
+          const currentQty = item.quantity || 1;
+          const newQty = currentQty + delta;
+          if (newQty < 1) {
+            // Jika quantity < 1, hapus item
+            return acc;
+          } else {
+            return [...acc, { ...item, quantity: newQty }];
+          }
+        } else {
+          return [...acc, item];
+        }
+      }, []);
+    });
+  };
   
+  // Validasi input untuk enable/disable tombol
+  const isFormValid = !!selectedAddress && items.length > 0 && photos.length > 0 && !!selectedDate;
   
   return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
     <ScrollView
     style={{ flex: 1, backgroundColor: "white" }}
     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -259,51 +412,28 @@ export default function PenyetoranScreen() {
         <Text style={{ fontSize: 20, fontWeight: "bold", color: "black" }}>
           Alamat Penjemputan
         </Text>
-        <TouchableOpacity onPress={() => navigation.navigate("AddAddress")}>
+        <TouchableOpacity onPress={() => navigation.navigate('DaftarAlamat')}> 
           <Text style={{ color: "#25c05d", fontWeight: "bold" }}>
-            Tambah Alamat
+            Pilih Alamat Lain
           </Text>
         </TouchableOpacity>
       </View>
-
-      {/* Menampilkan alamat */}
       {loading ? (
         <Text>Loading...</Text>
-      ) : addresses.length > 0 ? (
+      ) : selectedAddress ? (
         <View
-          style={{ backgroundColor: "#f3f3f3", borderRadius: 10, padding: 16 }}
+          style={{ backgroundColor: "#f3f3f3", borderRadius: 10, padding: 16, marginBottom: 8 }}
         >
-          <Text style={{ fontSize: 16, fontWeight: "bold", color: "black" }}>
-            Pilih Alamat
+          <Text style={{ fontWeight: "bold", fontSize: 16 }}>
+            {selectedAddress.label_Alamat}
           </Text>
-          {addresses.map((item: any) => (
-            <TouchableOpacity
-              key={item.id}
-              style={{
-                marginTop: 8,
-                padding: 8,
-                backgroundColor:
-                  selectedAddress?.id === item.id ? "#d3f4db" : "#f3f3f3",
-                borderRadius: 8,
-                flexDirection: "row",
-                justifyContent: "space-between",
-              }}
-              onPress={() => setSelectedAddress(item)}
-            >
-              <View>
-                <Text style={{ fontSize: 16, fontWeight: "bold", color: "black" }}>
-                  {item.label_Alamat}
-                </Text>
-                <Text style={{ fontSize: 14, color: "#25c05d" }}>
-                  {item.Kecamatan}
-                </Text>
-                <Text style={{ fontSize: 14, color: "black" }}>
-                  {item.Nama} ({item.No_tlp}){"\n"}
-                  {item.Detail_Alamat}, {item["kota-kabupaten"]}, Kode Pos: {item.Kode_pos}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+          <Text style={{ color: "#25c05d" }}>
+            {selectedAddress.Kecamatan}
+          </Text>
+          <Text style={{ fontSize: 14, color: "black" }}>
+            {selectedAddress.Nama} ({selectedAddress.No_tlp}){"\n"}
+            {selectedAddress.Detail_Alamat}, {selectedAddress["kota-kabupaten"]}, Kode Pos: {selectedAddress.Kode_pos}
+          </Text>
         </View>
       ) : (
         <Text style={{ fontSize: 14, color: "black" }}>
@@ -325,7 +455,7 @@ export default function PenyetoranScreen() {
           <Text style={{ fontSize: 20, fontWeight: "bold", color: "black" }}>
             Item Sampah
           </Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={handleAddItem}>
             <Text style={{ color: "#25c05d", fontWeight: "bold" }}>
               Tambah Sampah?
             </Text>
@@ -334,58 +464,90 @@ export default function PenyetoranScreen() {
 
         {/* Displaying items dynamically */}
         <View style={{ marginTop: 4, marginBottom: 4 }}>
-  {items.length > 0 ? (
-    items.map((item: any, index: number) => {
-      // Menentukan cara menghitung poin berdasarkan kategori
-      const pointDisplay = item.type === "Non-organik-elektronik"
-        ? `${item.points} Poin / Unit`
-        : `${item.points} Poin / Kg`;
+          {items.length > 0 ? (
+            items.map((item: any, index: number) => {
+              // Menentukan cara menghitung poin berdasarkan kategori
+              const pointDisplay = item.type === "Non-organik-elektronik"
+                ? `${item.points} Poin / Unit`
+                : `${item.points} Poin / Kg`;
 
-      return (
-        <View
-          key={index}
-          style={{
-            backgroundColor: "#f3f3f3",
-            borderRadius: 10,
-            flexDirection: "row",
-            alignItems: "center",
-            padding: 16,
-            shadowColor: "black",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.25,
-            shadowRadius: 3.84,
-            elevation: 5,
-            marginBottom: 10
-          }}
-        >
-          {/* Menampilkan gambar berdasarkan nama item */}
-          <Image
-            source={getImageSource(item.image)}  // Menggunakan nama gambar dari item.imageUrl
-            style={{ width: 41, height: 56.78, marginRight: 16 }}
-          />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 16, fontWeight: "bold", color: "black" }}>
-              {item.name} {/* Nama item */}
-            </Text>
-            <Text style={{ fontSize: 14, color: "gray" }}>
-              {item.type} {/* Kategori item */}
-            </Text>
-            <Text style={{ fontSize: 14, color: "#25c05d", fontWeight: "bold" }}>
-              {pointDisplay} {/* Menampilkan poin berdasarkan kategori */}
-            </Text>
-          </View>
-          <TouchableOpacity>
-            <Text style={{ color: "#25c05d", fontWeight: "bold" }}>
-              Lihat Detail
-            </Text>
-          </TouchableOpacity>
+              return (
+                <View
+                  key={index}
+                  style={{
+                    backgroundColor: "#f3f3f3",
+                    borderRadius: 10,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    padding: 16,
+                    shadowColor: "black",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 3.84,
+                    elevation: 5,
+                    marginBottom: 10
+                  }}
+                >
+                  {/* Menampilkan gambar berdasarkan nama item */}
+                  <Image
+                    source={getImageSource(item.image)}  // Menggunakan nama gambar dari item.imageUrl
+                    style={{ width: 41, height: 56.78, marginRight: 16 }}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 16, fontWeight: "bold", color: "black" }}>
+                      {item.name} {/* Nama item */}
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "gray" }}>
+                      {item.type} {/* Kategori item */}
+                    </Text>
+                    <Text style={{ fontSize: 14, color: "#25c05d", fontWeight: "bold" }}>
+                      {pointDisplay} {/* Menampilkan poin berdasarkan kategori */}
+                    </Text>
+                    {/* Kontrol quantity */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: '#25c05d',
+                          borderRadius: 20,
+                          width: 32,
+                          height: 32,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginRight: 8,
+                        }}
+                        onPress={() => handleChangeItemQuantity(item.id || item.itemId, -1)}
+                      >
+                        <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold' }}>-</Text>
+                      </TouchableOpacity>
+                      <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#333', minWidth: 32, textAlign: 'center' }}>{item.quantity || 1}</Text>
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: '#25c05d',
+                          borderRadius: 20,
+                          width: 32,
+                          height: 32,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginLeft: 8,
+                        }}
+                        onPress={() => handleChangeItemQuantity(item.id || item.itemId, 1)}
+                      >
+                        <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold' }}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <TouchableOpacity>
+                    <Text style={{ color: "#25c05d", fontWeight: "bold" }}>
+                      Lihat Detail
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })
+          ) : (
+            <Text style={{ fontSize: 14, color: "black" }}>No items available.</Text>
+          )}
         </View>
-      );
-    })
-  ) : (
-    <Text style={{ fontSize: 14, color: "black" }}>No items available.</Text>
-  )}
-</View>
 
 
       </View>
@@ -517,23 +679,37 @@ export default function PenyetoranScreen() {
           </View>
         </View>
       </Modal>
-       {/* Tombol Konfirmasi */}
+       {/* Biaya Penjemputan (dinamis sesuai kecamatan) */}
+       {pickupFee !== null && (
+          <View style={{ backgroundColor: '#E0F7EF', borderRadius: 8, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: '#22B07D' }}>
+            <Text style={{ color: '#22B07D', fontSize: 15, textAlign: 'center', fontWeight: 'bold' }}>
+              Biaya Penjemputan: {Number(pickupFee) > 0 ? `Rp ${Number(pickupFee).toLocaleString('id-ID')}` : 'Gratis'}
+            </Text>
+          </View>
+        )}
+        {/* Note biaya penjemputan dipotong dari poin */}
+        <View style={{ backgroundColor: '#FFF8E1', borderRadius: 8, padding: 10, marginBottom: 16, borderWidth: 1, borderColor: '#FFD54F' }}>
+          <Text style={{ color: '#B8860B', fontSize: 14, textAlign: 'center' }}>
+            *Biaya penjemputan akan otomatis dipotong dari poin yang Anda dapatkan setelah penyetoran selesai.
+          </Text>
+        </View>
        <TouchableOpacity
   onPress={handleSubmitWithPhotos}
   style={{
-    backgroundColor: "#25c05d",
+    backgroundColor: isFormValid ? "#25c05d" : '#ccc',
     paddingVertical: 16,
     borderRadius: 10,
     marginHorizontal: 16,
     marginTop: 16,
   }}
+  disabled={!isFormValid}
 >
   <Text style={{ textAlign: "center", fontSize: 18, color: "white" }}>
     Konfirmasi Penyetoran
   </Text>
 </TouchableOpacity>
   
-
-    </ScrollView>
+  </ScrollView>
+    </SafeAreaView>
   );
 }

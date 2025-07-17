@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { getAuth } from "firebase/auth";
-import CONFIG from "./../config";
+import CONFIG from "../config";
 import AsyncStorage from "@react-native-async-storage/async-storage"; // Import AsyncStorage
 
 type Item = {
@@ -25,7 +25,7 @@ type Item = {
 };
 
 const imageMapping: { [key: string]: any } = {
-  'default-sampah': require('../../assets/images/default-sampah.png'),
+  "default-sampah.png": require("../../assets/images/default-sampah.png"),
   "monitor-lcd.jpg": require("../../assets/images/elektronik/monitor-lcd.jpg"),
   "monitor-tabung.jpg": require("../../assets/images/elektronik/monitor-tabung.jpg"),
   "botol_kaca.png": require("../../assets/images/kaca/botol_kaca.png"),
@@ -48,6 +48,9 @@ const imageMapping: { [key: string]: any } = {
 const getImageSource = (imageName: string) => {
   return imageMapping[imageName] || imageMapping["default"];
 };
+
+// Fungsi untuk format angka poin
+const formatPoin = (poin: number) => poin.toLocaleString('id-ID');
 
 export default function SelesaiScreen() {
   const [loading, setLoading] = useState(true);
@@ -118,9 +121,8 @@ export default function SelesaiScreen() {
     for (let item of pickupData) {
       if (item.status === "Selesai") {
         const uniqueItemId = item.id; // ID utama pesanan sebagai identifier unik
-        const pointsAdded = await AsyncStorage.getItem(`pointsAdded_${uniqueItemId}`);
-        
-        if (!pointsAdded) {
+        // CEK pointsAdded dari Firestore
+        if (!item.pointsAdded) {
           const totalPoints = item.items.reduce((acc: number, subItem: Item) => {
             return acc + subItem.points * subItem.quantity;
           }, 0);
@@ -130,7 +132,8 @@ export default function SelesaiScreen() {
           if (grandTotal > 0) {
             console.log(`Mengirimkan poin untuk ${uniqueItemId}:`, grandTotal);
             await addPointsToUser(grandTotal); // Kirim poin ke backend
-            await AsyncStorage.setItem(`pointsAdded_${uniqueItemId}`, "true"); // Tandai bahwa poin sudah ditambahkan
+            // Tandai di Firestore bahwa poin sudah ditambahkan
+            await fetch(`${CONFIG.API_URL}/api/mark-points-added/${uniqueItemId}`, { method: 'PUT' });
           } else {
             console.log(`Grand total untuk ${uniqueItemId} tidak valid:`, grandTotal);
           }
@@ -178,7 +181,7 @@ export default function SelesaiScreen() {
                 <View style={styles.itemDetails}>
                   <Text style={styles.itemName}>{subItem.name}</Text>
                   <Text style={styles.itemPoints}>
-                    {subItem.points} Poin / {subItem.type === "Non-organik-elektronik" ? "unit" : "Kg"}
+                    {formatPoin(subItem.points)} Poin / {subItem.type === "Non-organik-elektronik" ? "unit" : "Kg"}
                   </Text>
                   <Text style={styles.itemQuantity}>
                     Kuantitas: {subItem.quantity || "Tidak tersedia"}
@@ -202,32 +205,37 @@ export default function SelesaiScreen() {
             </Text>
           </View>
 
-          {/* Tabel Jenis Sampah */}
-          <View style={styles.tableSection}>
-            <View style={styles.tableHeader}>
-              <Text style={styles.tableColumn}>Jenis Sampah</Text>
-              <Text style={styles.tableColumn}>Kuantitas</Text>
-              <Text style={styles.tableColumn}>Harga Poin</Text>
-              <Text style={styles.tableColumn}>Total Poin</Text>
-            </View>
-            {item.items.map((subItem: Item, idx: number) => (
-              <View style={styles.tableRow} key={idx}>
-                <Text style={styles.tableColumn}>{subItem.name}</Text>
-                <Text style={styles.tableColumn}>
-                  {subItem.quantity || "Tidak tersedia"}
-                </Text>
-                <Text style={styles.tableColumn}>
-                  {subItem.points} Poin
-                </Text>
-                <Text style={styles.tableColumn}>
-                  {subItem.points * subItem.quantity} Poin
-                </Text>
+          {/* Tabel Jenis Sampah (tampilkan dengan style tabel rapi dan border) */}
+          <View style={styles.detailTableWrapper}>
+            <View style={styles.detailTableSection}>
+              <View style={styles.detailTableHeader}>
+                <Text style={styles.detailTableColumn}>Jenis Sampah</Text>
+                <Text style={styles.detailTableColumn}>Kuantitas</Text>
+                <Text style={styles.detailTableColumn}>Harga Poin</Text>
+                <Text style={styles.detailTableColumn}>Total Poin</Text>
               </View>
-            ))}
-            <View style={styles.tableFooter}>
-              <Text style={styles.tableFooterText}>Total Poin: {grandTotal} Poin</Text>
+              {item.items.map((subItem: Item, idx: number) => (
+                <View style={styles.detailTableRow} key={idx}>
+                  <Text style={styles.detailTableColumn}>{subItem.name}</Text>
+                  <Text style={styles.detailTableColumn}>{subItem.quantity || "Tidak tersedia"}</Text>
+                  <Text style={styles.detailTableColumn}>{formatPoin(subItem.points)} Poin</Text>
+                  <Text style={styles.detailTableColumn}>{formatPoin(subItem.points * subItem.quantity)} Poin</Text>
+                </View>
+              ))}
             </View>
           </View>
+          {/* Ringkasan Poin dan Pickup Fee */}
+          <View style={styles.summaryBox}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Pickup Fee</Text>
+                <Text style={styles.summaryValueFee}>{formatPoin(item.pickUpFee)} Poin</Text>
+              </View>
+              <View style={styles.separator} />
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Total Poin</Text>
+                <Text style={styles.summaryValueTotal}>{formatPoin(grandTotal)} Poin</Text>
+              </View>
+            </View>
         </View>
       );
     });
@@ -347,5 +355,74 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#888",
     marginTop: 50,
+  },
+  summaryBox: {
+    backgroundColor: '#f1f1f1',
+    borderRadius: 8,
+    marginTop: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  summaryLabel: {
+    fontSize: 15,
+    color: '#333',
+    fontWeight: '500',
+  },
+  summaryValueTotal: {
+    fontSize: 16,
+    color: '#388e3c', // hijau
+    fontWeight: 'bold',
+  },
+  summaryValueFee: {
+    fontSize: 15,
+    color: '#888',
+    fontWeight: '500',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#ddd',
+    marginVertical: 4,
+  },
+  detailTableWrapper: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 16,
+    marginTop: 8,
+    backgroundColor: '#fff',
+    elevation: 1,
+  },
+  detailTableSection: {
+    // kosongkan, biar wrapper yang handle border dan bg
+  },
+  detailTableHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#e0e0e0',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  detailTableRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#f9f9f9',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  detailTableColumn: {
+    flex: 1,
+    fontSize: 14,
+    textAlign: 'center',
+    fontWeight: '500',
   },
 });

@@ -90,6 +90,7 @@ app.post('/api/register', [
             namaRekening,
             noRekening,
             level: 'penyumbang',
+            status: 'Non-Aktif',
             point: 0,
             totalpointmasuk: 0,
             totalpointkeluar: 0,
@@ -256,7 +257,7 @@ app.delete('/api/delete-item/:itemId', async (req, res) => {
 
 // Endpoint untuk menambah alamat
 app.post('/api/add-address', async (req, res) => {
-    const { userId, nama, noTlp, labelAlamat, kotaKabupaten, kecamatan, kodePos, detailAlamat } = req.body;
+    const { userId, nama, noTlp, labelAlamat, kotaKabupaten, kecamatan, kodePos, detailAlamat, blokNo, rtRw } = req.body;
 
     console.log('Received POST request at /api/add-address');
     console.log('Request body:', req.body);
@@ -272,6 +273,8 @@ app.post('/api/add-address', async (req, res) => {
             Kecamatan: kecamatan,
             Kode_pos: kodePos,
             Detail_Alamat: detailAlamat,
+            Blok_No: blokNo,
+            rtRw: rtRw,
             userId,
         };
 
@@ -307,13 +310,80 @@ app.get('/api/get-addresses/:userId', async (req, res) => {
         if (addresses.length > 0) {
             return res.status(200).json(addresses);
         } else {
-            return res.status(404).send('No addresses found');
+            return res.status(200).json([]); // Selalu kirim array kosong jika tidak ada alamat
         }
     } catch (error) {
         console.error('Error fetching addresses:', error);
         return res.status(500).send('Error fetching addresses');
     }
 });
+
+// Endpoint untuk edit alamat
+app.put('/api/edit-address/:id', async (req, res) => {
+    const { id } = req.params;
+    const {
+        nama,
+        noTlp,
+        labelAlamat,
+        kotaKabupaten,
+        kecamatan,
+        kodePos,
+        detailAlamat,
+        blokNo,
+        rtRw
+    } = req.body;
+
+    try {
+        const addressRef = doc(db, 'Alamat', id);
+        // Update data alamat sesuai struktur
+        await updateDoc(addressRef, {
+            Nama: nama,
+            No_tlp: noTlp,
+            label_Alamat: labelAlamat,
+            "kota-kabupaten": kotaKabupaten,
+            Kecamatan: kecamatan,
+            Kode_pos: kodePos,
+            Detail_Alamat: detailAlamat,
+            Blok_No: blokNo,
+            rtRw: rtRw
+        });
+        return res.status(200).json({ message: 'Alamat berhasil diupdate' });
+    } catch (error) {
+        console.error('Error updating address:', error);
+        return res.status(500).json({ message: 'Gagal mengupdate alamat' });
+    }
+});
+
+// Mapping biaya penjemputan daur ulang per kecamatan
+const kecamatanBiayaDaurUlang = {
+  "Batam Kota": 15000,
+  "Lubuk Baja": 22500,
+  "Batu Ampar": 25000,
+  "Bengkong": 27500,
+  "Sei Beduk": 30000,
+  "Nongsa": 35000,
+  "Sekupang": 40000,
+  "Batu Aji": 45000,
+  "Sagulung": 50000,
+  "Belakang Padang": 80000,
+  "Bulang": 90000,
+  "Galang": 115000,
+};
+async function getPickupFeeDaurUlang(kecamatan) {
+  const feeDocRef = doc(db, 'settings', 'pickupFeeKecamatan');
+  const feeDoc = await getDoc(feeDocRef);
+  let mapping = {};
+  if (feeDoc.exists() && typeof feeDoc.data().mapping === 'object') {
+    mapping = feeDoc.data().mapping;
+  }
+  // Normalisasi key kecamatan
+  const kecamatanUser = (kecamatan || '').trim().toLowerCase();
+  const mappingKeys = Object.keys(mapping);
+  const foundKey = mappingKeys.find(
+    k => k.trim().toLowerCase() === kecamatanUser
+  );
+  return foundKey ? mapping[foundKey] : 20000;
+}
 
 app.post('/api/submit-pickup', upload.array('photos'), async (req, res) => {
     try {
@@ -366,6 +436,10 @@ app.post('/api/submit-pickup', upload.array('photos'), async (req, res) => {
         // Generate nomor antrean baru
         const newQueueNumber = `ANTRIAN-${String(lastQueueNumber + 1).padStart(3, '0')}`;
 
+        // Hitung biaya penjemputan berdasarkan kecamatan
+        const kecamatan = parsedAddress.Kecamatan;
+        const pickUpFee = await getPickupFeeDaurUlang(kecamatan);
+
         // Simpan data pickup ke Firestore
         const pickupData = {
             userId,
@@ -374,7 +448,7 @@ app.post('/api/submit-pickup', upload.array('photos'), async (req, res) => {
             items: parsedItems,
             photos: photoUrls,
             pickUpDate: isoFormattedPickUpDate, // Gunakan formattedPickUpDate dalam ISO
-            pickUpFee : 500,
+            pickUpFee: pickUpFee, // Gunakan biaya hasil fungsi
             status: "Pending",
             createdAt: new Date().toISOString(),
         };
@@ -663,34 +737,43 @@ app.put('/api/update-track-status', async (req, res) => {
     }
 });
 
-app.put("/api/update-quantity/:itemId", async (req, res) => {
-    const { itemId } = req.params; // itemId diambil dari URL parameter
+app.put("/api/update-quantity/:id", async (req, res) => {
+    const { id } = req.params; // id diambil dari URL parameter
     const { pickupId, newQuantity } = req.body; // pickupId dan newQuantity diambil dari body request
-  
+
+    // Tambahkan log debug
+    console.log('BACKEND DEBUG update-quantity:', {
+      id,
+      pickupId,
+      newQuantity,
+      typeofNewQuantity: typeof newQuantity,
+      body: req.body
+    });
+
     // Validasi input
-    if (!pickupId || !itemId || newQuantity === undefined) {
+    if (!pickupId || !id || newQuantity === undefined) {
       return res.status(400).json({
-        message: "pickupId, itemId, dan newQuantity harus diberikan",
+        message: "pickupId, id, dan newQuantity harus diberikan",
       });
     }
-  
+
     try {
       const pickupRef = doc(db, "Penyetoran", pickupId); // Referensi ke dokumen Penyetoran
       const docSnapshot = await getDoc(pickupRef);
-  
+
       // Cek apakah dokumen ada
       if (!docSnapshot.exists()) {
         return res.status(404).json({ message: "Data tidak ditemukan" });
       }
-  
+
       const data = docSnapshot.data();
       const updatedItems = data.items.map((item) =>
-        item.itemId === itemId ? { ...item, quantity: newQuantity } : item
+        item.id === id ? { ...item, quantity: newQuantity } : item
       );
-  
+
       // Perbarui dokumen di koleksi Penyetoran
       await updateDoc(pickupRef, { items: updatedItems });
-  
+
       return res.status(200).json({
         success: true,
         message: `Quantity berhasil diubah menjadi ${newQuantity}`,
@@ -833,7 +916,232 @@ app.post('/api/cancel-pickup/:id', async (req, res) => {
   }
 });
 
+// === CAMPAIGN API ===
+// Ambil semua campaign
+app.get('/api/campaigns', async (req, res) => {
+  try {
+    const campaignsRef = collection(db, 'campaigns');
+    const snapshot = await getDocs(campaignsRef);
+    const now = new Date();
+
+    const campaigns = await Promise.all(snapshot.docs.map(async doc => {
+      const data = doc.data();
+      let campaignDate = null;
+      let isEnded = false;
+      try {
+        const [day, month, year] = data.date.split(' ');
+        const monthMap = {
+          'Januari': 0, 'Februari': 1, 'Maret': 2, 'April': 3, 'Mei': 4, 'Juni': 5,
+          'Juli': 6, 'Agustus': 7, 'September': 8, 'Oktober': 9, 'November': 10, 'Desember': 11
+        };
+        campaignDate = new Date(Number(year), monthMap[month], Number(day));
+        if (
+          campaignDate.getFullYear() === now.getFullYear() &&
+          campaignDate.getMonth() === now.getMonth() &&
+          campaignDate.getDate() === now.getDate() &&
+          data.time
+        ) {
+          // Format time: '09.00–10.30 WIB', '05:05-06:10', '05.05-06.10', dst
+          let timeStr = data.time.replace('–', '-').replace('—', '-').replace('–', '-');
+          let timeRange = timeStr.split('-');
+          if (timeRange.length === 2) {
+            let endTime = timeRange[1].replace('WIB', '').trim(); // '10.30' atau '06:10'
+            // Deteksi pemisah jam
+            let hour = 0, minute = 0;
+            if (endTime.includes(':')) {
+              [hour, minute] = endTime.split(':').map(Number);
+            } else if (endTime.includes('.')) {
+              [hour, minute] = endTime.split('.').map(Number);
+            }
+            const campaignEnd = new Date(now);
+            campaignEnd.setHours(hour, minute, 0, 0);
+            console.log('now:', now, 'campaignEnd:', campaignEnd, 'isEnded:', isEnded, 'title:', data.title);
+            if (now > campaignEnd) {
+              isEnded = true;
+            }
+          }
+        } else if (campaignDate < now) {
+          isEnded = true;
+        }
+      } catch (e) {
+        if (campaignDate && campaignDate < now) isEnded = true;
+      }
+      if (data.status === 'ongoing' && isEnded) {
+        await updateDoc(doc.ref, { status: 'ended' });
+        data.status = 'ended';
+      }
+      return { id: doc.id, ...data };
+    }));
+
+    res.status(200).json(campaigns);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching campaigns' });
+  }
+});
+
+// Tambah campaign baru
+app.post('/api/campaigns', upload.single('image'), async (req, res) => {
+  try {
+    const { title, date, location, organizer, status = 'ongoing', time, registerLink, description, latitude, longitude } = req.body;
+    let imageUrl = '';
+    if (req.file) {
+      imageUrl = `/uploads/photos/${req.file.filename}`;
+    }
+    if (!title || !date || !location || !organizer) {
+      return res.status(400).json({ message: 'Semua field harus diisi' });
+    }
+    // Pastikan latitude dan longitude bertipe number jika ada
+    let lat = latitude !== undefined && latitude !== '' ? Number(latitude) : null;
+    let lng = longitude !== undefined && longitude !== '' ? Number(longitude) : null;
+    const newCampaign = {
+      title,
+      date,
+      time: time || '',
+      location,
+      organizer,
+      registerLink: registerLink || '',
+      description: description || '',
+      status,
+      image: imageUrl,
+      createdAt: new Date().toISOString(),
+      // Tambahkan latitude dan longitude jika ada
+      ...(lat !== null && !isNaN(lat) ? { latitude: lat } : {}),
+      ...(lng !== null && !isNaN(lng) ? { longitude: lng } : {}),
+    };
+    const docRef = await addDoc(collection(db, 'campaigns'), newCampaign);
+    res.status(201).json({ id: docRef.id, ...newCampaign });
+  } catch (error) {
+    console.error('Error adding campaign:', error);
+    res.status(500).json({ message: 'Error adding campaign' });
+  }
+});
+
+// Scheduled job untuk update status campaign setiap 1 menit
+setInterval(async () => {
+  try {
+    const campaignsRef = collection(db, 'campaigns');
+    const snapshot = await getDocs(campaignsRef);
+    const now = new Date();
+    const monthMap = {
+      'Januari': 0, 'Februari': 1, 'Maret': 2, 'April': 3, 'Mei': 4, 'Juni': 5,
+      'Juli': 6, 'Agustus': 7, 'September': 8, 'Oktober': 9, 'November': 10, 'Desember': 11
+    };
+    for (const docSnap of snapshot.docs) {
+      const data = docSnap.data();
+      let campaignDate = null;
+      let isEnded = false;
+      try {
+        const [day, month, year] = data.date.split(' ');
+        campaignDate = new Date(Number(year), monthMap[month], Number(day));
+        if (
+          campaignDate.getFullYear() === now.getFullYear() &&
+          campaignDate.getMonth() === now.getMonth() &&
+          campaignDate.getDate() === now.getDate() &&
+          data.time
+        ) {
+          let timeStr = data.time.replace('–', '-').replace('—', '-').replace('–', '-');
+          let timeRange = timeStr.split('-');
+          if (timeRange.length === 2) {
+            let endTime = timeRange[1].replace('WIB', '').trim();
+            let hour = 0, minute = 0;
+            if (endTime.includes(':')) {
+              [hour, minute] = endTime.split(':').map(Number);
+            } else if (endTime.includes('.')) {
+              [hour, minute] = endTime.split('.').map(Number);
+            }
+            const campaignEnd = new Date(now);
+            campaignEnd.setHours(hour, minute, 0, 0);
+            if (now > campaignEnd) {
+              isEnded = true;
+            }
+          }
+        } else if (campaignDate < now) {
+          isEnded = true;
+        }
+      } catch (e) {
+        if (campaignDate && campaignDate < now) isEnded = true;
+      }
+      if (data.status === 'ongoing' && isEnded) {
+        await updateDoc(docSnap.ref, { status: 'ended' });
+      }
+    }
+  } catch (e) {
+    console.error('Scheduled campaign status update error:', e);
+  }
+}, 60000);
+
 // Mulai server
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
+});
+
+// Endpoint untuk mengambil biaya penjemputan
+app.get('/api/pickup-fee', async (req, res) => {
+  try {
+    const feeDocRef = doc(db, 'settings', 'pickupFee');
+    const feeDoc = await getDoc(feeDocRef);
+    let fee = 500;
+    if (feeDoc.exists() && typeof feeDoc.data().fee === 'number') {
+      fee = feeDoc.data().fee;
+    }
+    res.json({ fee });
+  } catch (error) {
+    res.status(500).json({ message: 'Gagal mengambil biaya penjemputan' });
+  }
+});
+
+// Endpoint untuk mengubah biaya penjemputan
+app.put('/api/pickup-fee', async (req, res) => {
+  try {
+    const { fee } = req.body;
+    if (typeof fee !== 'number' || fee < 0) {
+      return res.status(400).json({ message: 'Fee tidak valid' });
+    }
+    const feeDocRef = doc(db, 'settings', 'pickupFee');
+    await setDoc(feeDocRef, { fee });
+    res.json({ message: 'Biaya penjemputan berhasil diubah', fee });
+  } catch (error) {
+    res.status(500).json({ message: 'Gagal mengubah biaya penjemputan' });
+  }
+});
+
+// === PICKUP FEE PER KECAMATAN ===
+// Endpoint GET: ambil mapping biaya per kecamatan
+app.get('/api/pickup-fee-kecamatan', async (req, res) => {
+  try {
+    const feeDocRef = doc(db, 'settings', 'pickupFeeKecamatan');
+    const feeDoc = await getDoc(feeDocRef);
+    let mapping = {};
+    if (feeDoc.exists() && typeof feeDoc.data().mapping === 'object') {
+      mapping = feeDoc.data().mapping;
+    }
+    res.json({ mapping });
+  } catch (error) {
+    res.status(500).json({ message: 'Gagal mengambil biaya penjemputan per kecamatan' });
+  }
+});
+// Endpoint PUT: update mapping biaya per kecamatan
+app.put('/api/pickup-fee-kecamatan', async (req, res) => {
+  try {
+    const { mapping } = req.body;
+    if (!mapping || typeof mapping !== 'object') {
+      return res.status(400).json({ message: 'Mapping tidak valid' });
+    }
+    const feeDocRef = doc(db, 'settings', 'pickupFeeKecamatan');
+    await setDoc(feeDocRef, { mapping });
+    res.json({ message: 'Biaya penjemputan per kecamatan berhasil diubah', mapping });
+  } catch (error) {
+    res.status(500).json({ message: 'Gagal mengubah biaya penjemputan per kecamatan' });
+  }
+});
+
+app.put('/api/mark-points-added/:pickupId', async (req, res) => {
+  const { pickupId } = req.params;
+  try {
+    const pickupRef = doc(db, 'Penyetoran', pickupId);
+    await updateDoc(pickupRef, { pointsAdded: true });
+    res.status(200).json({ message: 'pointsAdded updated' });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update pointsAdded' });
+  }
 });

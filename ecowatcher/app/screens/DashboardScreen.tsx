@@ -1,11 +1,11 @@
 import React from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack'; // Add this
-import { RootStackParamList } from '../types'; // Import type RootStackParamList if applicable
+import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // Add this
+import { RootStackParamList } from '../../utils/types'; // Import type RootStackParamList if applicable
 
 // Define navigation type
-type DashboardScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Dashboard'>;
+type DashboardScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const DashboardScreen = () => {
   const navigation = useNavigation<DashboardScreenNavigationProp>(); // Use correct navigation type

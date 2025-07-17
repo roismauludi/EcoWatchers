@@ -1,11 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, FlatList, Image, TouchableOpacity, Modal } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import CONFIG from '../config';
-import { useSelectedItems } from '../(tabs)/context/SelectedItemsContext'; // Pastikan path benar
-import { RootStackParamList } from '../types';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { CatalogItem } from "../CatalogItem";
+// app/(tabs)/catalog.tsx
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  FlatList,
+  Image,
+  TouchableOpacity,
+  Modal,
+  Dimensions,
+  PixelRatio,
+} from "react-native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import CONFIG from "../config";
+import { useSelectedItems } from "../../context/SelectedItemsContext";
+import { RootStackParamList } from "../../utils/types";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { CatalogItem } from "../../utils/CatalogItem";
+import { LinearGradient } from "expo-linear-gradient";
 
 const imageAssets: { [key: string]: any } = {
   "default-sampah.png": require("../../assets/images/default-sampah.png"),
@@ -29,311 +42,414 @@ const imageAssets: { [key: string]: any } = {
 };
 
 const CatalogScreen = () => {
-  const { selectedItems, setSelectedItems } = useSelectedItems(); 
+  const { selectedItems, setSelectedItems } = useSelectedItems();
   const [catalogData, setCatalogData] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
-  const [searchText, setSearchText] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>("Semua");
+  const [searchText, setSearchText] = useState<string>("");
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
-  const [numColumns, setNumColumns] = useState(3);
 
-  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute();
+  const onSelectItem = (route.params as any)?.onSelectItem;
 
   useEffect(() => {
     const fetchCatalogData = async () => {
       try {
         const response = await fetch(`${CONFIG.API_URL}/api/catalog`);
-        if (!response.ok) {
-          throw new Error('Error fetching catalog data');
-        }
         const data: CatalogItem[] = await response.json();
-    
-        // Tambahkan properti `quantity` jika tidak ada
-        const dataWithQuantity = data.map(item => ({
+        const withQuantity = data.map((item) => ({
           ...item,
-          quantity: item.quantity ?? 1, // Default ke 1 jika `quantity` tidak ada
+          quantity: item.quantity ?? 1,
         }));
-    
-        setCatalogData(dataWithQuantity);
-      } catch (error) {
-        console.error('Error fetching catalog data: ', error);
+        setCatalogData(withQuantity);
+      } catch (err) {
+        console.error("Fetch error:", err);
       } finally {
         setLoading(false);
       }
     };
-    
-  
+
     fetchCatalogData();
   }, []);
-  
 
   const filteredData = catalogData.filter((item) => {
-    const matchCategory = selectedCategory === 'Semua' || item.category === selectedCategory;
-    const matchSearchText = item.name.toLowerCase().includes(searchText.toLowerCase());
-    return matchCategory && matchSearchText;
+    const matchCategory =
+      selectedCategory === "Semua" || item.category === selectedCategory;
+    const matchSearch = item.name
+      .toLowerCase()
+      .includes(searchText.toLowerCase());
+    return matchCategory && matchSearch;
   });
 
-  const handleItemPress = (item: CatalogItem) => {
-    setSelectedItem(item);
-    setModalVisible(true);
-  };
-
-  const closeModal = () => {
-    setModalVisible(false);
-    setSelectedItem(null);
-  };
-
-  const handleCategoryChange = (category: string) => {
-    setSelectedCategory(category);
-    setNumColumns(category === 'Semua' ? 3 : 2);
-  };
-
-  const handleAddToTong = (item: CatalogItem) => {
-    // Pemetaan kategori ke tipe yang lebih spesifik
-    const categoryMapping: { [key: string]: string } = {
-      Elektronik: 'Non-organik-elektronik',
-      Kaca: 'Non-organik-kaca',
-      Kertas: 'Non-organik-kertas',
-      Logam: 'Non-organik-logam',
-      Minyak: 'Non-organik-minyak',
-      Plastik: 'Non-organik-plastik',
-    };
-  
-    // Tentukan tipe berdasarkan kategori item
-    const itemType = categoryMapping[item.category] || 'Non-organik-lainnya'; 
-  
-    // Log data item yang akan ditambahkan
-    console.log('Item yang ditambahkan:', { ...item, type: itemType });
-  
-    // Cek jika item sudah ada di Tong
-    const isItemAlreadyInTong = selectedItems.some(selected => selected.id === item.id);
-    
-    if (!isItemAlreadyInTong) {
-      // Tambahkan item dengan tipe yang telah diperbarui
-      setSelectedItems(prevItems => [
-        ...prevItems,
-        { ...item, type: itemType } // Pastikan `type` ditambahkan dengan benar
-      ]);
-    } else {
-      alert("Item sudah ada di Tong!");
+  const handleAddToPenyetoran = (item: CatalogItem) => {
+    if (onSelectItem) {
+      onSelectItem(item);
+      navigation.goBack();
+      return;
     }
-  
-    // Navigasi ke halaman Tong setelah item ditambahkan
+    // fallback ke tong jika tidak ada callback
+    const mapping: Record<string, string> = {
+      Elektronik: "Non-organik-elektronik",
+      Kaca: "Non-organik-kaca",
+      Kertas: "Non-organik-kertas",
+      Logam: "Non-organik-logam",
+      Minyak: "Non-organik-minyak",
+      Plastik: "Non-organik-plastik",
+    };
+    const type = mapping[item.category as string] || "Non-organik-lainnya";
+    const isExist = selectedItems.some((i) => i.id === item.id);
+    if (isExist) {
+      alert("Item sudah ada di Tong!");
+      return;
+    }
+    setSelectedItems([
+      ...selectedItems,
+      { ...item, type, category: item.category ?? "Tidak Diketahui" },
+    ]);
     navigation.navigate('Tong');
-  };  
-
-  const getImageSource = (imagePath: string) => {
-    return imageAssets[imagePath] || { uri: imagePath }; 
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text>Loading...</Text>
-      </View>
-    );
-  }
+  const getImageSource = (path: string) => imageAssets[path] || { uri: path };
+
+  const CATEGORIES = [
+    "Semua",
+    "Elektronik",
+    "Kaca",
+    "Kertas",
+    "Logam",
+    "Minyak",
+    "Plastik",
+  ];
+
+  const { width } = Dimensions.get("window");
+  const CARD_WIDTH = (width - 32 - 16) / 2; // padding container 16 + marginHorizontal kartu 8*2
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Cari item?"
-          value={searchText}
-          onChangeText={(text) => setSearchText(text)}
-        />
+      <LinearGradient
+        colors={["#4CAF50", "#43e97b"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.headerGradient}
+      >
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Katalog Sampah</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Cari sampah?"
+            placeholderTextColor="#B7B7B7"
+            value={searchText}
+            onChangeText={(text) => setSearchText(text)}
+          />
+        </View>
+      </LinearGradient>
+      <View style={styles.typeLabelContainer}>
+        <Text style={styles.typeLabelTitle}>Jenis Sampah</Text>
+        <Text style={styles.typeLabelDesc}>Pilih sampahmu dan setorkan!</Text>
       </View>
-
-      <View style={styles.categoryWrapper}>
-        {['Semua', 'Elektronik', 'Kaca', 'Kertas', 'Logam', 'Minyak', 'Plastik'].map((category) => (
+      <FlatList
+        data={CATEGORIES}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(item) => item}
+        contentContainerStyle={styles.filterScrollContent}
+        style={styles.filterScroll}
+        renderItem={({ item: cat }) => (
           <TouchableOpacity
-            key={category}
-            style={[styles.filterButton, selectedCategory === category && styles.filterButtonSelected]}
-            onPress={() => handleCategoryChange(category)}
+            onPress={() => setSelectedCategory(cat)}
+            style={[
+              styles.filterButton,
+              selectedCategory === cat && styles.filterButtonActive,
+            ]}
+            activeOpacity={0.7}
           >
-            <Text style={[styles.filterText, selectedCategory === category && styles.filterTextSelected]}>
-              {category}
+            <Text
+              style={[
+                styles.filterText,
+                selectedCategory === cat && styles.filterTextActive,
+              ]}
+              numberOfLines={1}
+              adjustsFontSizeToFit={true}
+              minimumFontScale={0.9}
+              allowFontScaling={true}
+            >
+              {cat}
             </Text>
           </TouchableOpacity>
-        ))}
-      </View>
-
+        )}
+      />
       <FlatList
-        key={selectedCategory}
         data={filteredData}
         keyExtractor={(item) => item.id}
-        numColumns={numColumns}
-        renderItem={({ item }) => {
-          return (
-            <TouchableOpacity onPress={() => handleItemPress(item)} style={styles.card}>
-              <Image source={getImageSource(item.image)} style={styles.itemImage} />
-              <Text style={styles.itemName}>{item.name}</Text>
-              <Text style={styles.itemType}>{item.category}</Text>
-              <Text style={styles.itemPoints}>
-                {item.points} Poin / {item.unit}
-              </Text>
-              <TouchableOpacity onPress={() => handleAddToTong(item)} style={styles.addButton}>
-                <Text style={styles.addButtonText}>Tambah ke Tong</Text>
-              </TouchableOpacity>
+        numColumns={2}
+        contentContainerStyle={styles.grid}
+        style={{ alignSelf: 'flex-start' }}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => {
+              setSelectedItem(item);
+              setModalVisible(true);
+            }}
+            activeOpacity={0.85}
+          >
+            <View style={styles.cardImageWrapper}>
+              <Image source={getImageSource(item.image)} style={styles.image} />
+            </View>
+            <Text style={styles.name}>{item.name}</Text>
+            <Text style={styles.categoryCard}>{item.category}</Text>
+            <Text style={styles.pointsCard}>
+              {item.points} Poin / {item.unit}
+            </Text>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => handleAddToPenyetoran(item)}
+            >
+              <Text style={styles.addButtonText}>Tambah ke Tong</Text>
             </TouchableOpacity>
-          );
-        }}
+          </TouchableOpacity>
+        )}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Tidak ada item ditemukan</Text>
-          </View>
+          <Text style={{ textAlign: "center", marginTop: 30, color: "#888" }}>
+            Tidak ada data untuk kategori ini.
+          </Text>
         }
-        contentContainerStyle={styles.listContainer}
+        ListFooterComponent={<View style={{ height: 160 }} />}
       />
-
       {selectedItem && (
-        <Modal animationType="slide" transparent={false} visible={modalVisible} onRequestClose={closeModal}>
-          <View style={styles.modalContainer}>
-            <Image source={getImageSource(selectedItem.image)} style={styles.modalImage} />
+        <Modal
+          visible={modalVisible}
+          animationType="slide"
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modal}>
+            <Image
+              source={getImageSource(selectedItem.image)}
+              style={styles.modalImage}
+            />
             <Text style={styles.modalTitle}>{selectedItem.name}</Text>
-            <Text style={styles.modalText}>{selectedItem.category}</Text>
-            <Text style={styles.modalPoints}>
+            <Text>{selectedItem.category}</Text>
+            <Text>
               {selectedItem.points} Poin / {selectedItem.unit}
             </Text>
-            <Text style={styles.modalDescription}>{selectedItem.description}</Text>
-            <TouchableOpacity style={styles.modalButton} onPress={closeModal}>
+            <Text style={styles.modalDescription}>
+              {selectedItem.description}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setModalVisible(false)}
+              style={styles.modalButton}
+            >
               <Text style={styles.modalButtonText}>Tutup</Text>
             </TouchableOpacity>
           </View>
         </Modal>
       )}
-
     </View>
   );
 };
 
+const { width } = Dimensions.get("window");
+const CARD_WIDTH = (width - 32 - 16) / 2; // padding container 16 + marginHorizontal kartu 8*2
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 10,
+  container: { backgroundColor: "#f5f5f5" },
+  headerGradient: {
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    paddingBottom: 30,
+    paddingTop: 50,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  headerContent: {
+    paddingHorizontal: 20,
   },
-  header: {
-    marginBottom: 10,
+  headerTitle: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 15,
+    marginTop: 10,
   },
   searchInput: {
-    borderWidth: 1,
-    padding: 8,
-    borderRadius: 5,
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    fontSize: 15,
+    color: "#333",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    marginBottom: 5,
   },
-  categoryWrapper: {
-    flexDirection: 'row',
-    marginBottom: 10,
-    flexWrap: 'wrap',
+  typeLabelContainer: {
+    marginTop: 10,
+    marginBottom: 2,
+    paddingHorizontal: 20,
+  },
+  typeLabelTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#222",
+    marginBottom: 2,
+  },
+  typeLabelDesc: {
+    fontSize: 13,
+    color: "#888",
+    marginBottom: 8,
+  },
+  filterScroll: {
+    marginTop: 2,
+    paddingHorizontal: 0, // biar lebih rapat
+    marginBottom: 10, // beri jarak lebih besar ke card agar responsif
+    minHeight: 50,
+  },
+  filterScrollContent: {
+    paddingLeft: 12,
+    paddingRight: 12,
+    alignItems: "center",
+    flexGrow: 1,
+    flexDirection: "row",
+    flexWrap: "wrap", // agar responsif jika banyak kategori
   },
   filterButton: {
-    marginRight: 10,
-    marginBottom: 10,
     paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderRadius: 5,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: "#4CAF50",
+    backgroundColor: "#fff",
+    marginRight: 8,
+    marginBottom: 5,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 70,
+    minHeight: 30,
+    elevation: 0,
   },
-  filterButtonSelected: {
-    backgroundColor: '#4CAF50',
+  filterButtonActive: {
+    backgroundColor: "#4CAF50",
+    borderColor: "#4CAF50",
   },
   filterText: {
-    fontSize: 14,
+    fontSize: Math.max(13, Math.round(width * 0.038)),
+    color: "#4CAF50",
+    fontWeight: "700",
+    textAlign: "center",
+    alignSelf: "center",
+    maxWidth: 90,
+    minWidth: 40,
+    paddingHorizontal: 2,
   },
-  filterTextSelected: {
-    color: 'white',
+  filterTextActive: {
+    color: "#fff",
+  },
+  grid: {
+    paddingHorizontal: 16,
+    paddingTop: 0,
+    paddingBottom: 160, // perbesar padding bawah agar item terakhir tidak tertutup
+    alignItems: 'flex-start',
   },
   card: {
-    width: '30%',
-    marginRight: '3%',
-    marginBottom: 15,
-    alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-    padding: 10,
-    borderRadius: 5,
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    padding: 12,
+    width: CARD_WIDTH,
+    marginBottom: 16,
+    marginHorizontal: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 1,
+    alignItems: "center",
   },
-  itemImage: {
-    width: 60,
-    height: 60,
+  cardImageWrapper: {
+    width: 80,
+    height: 80,
+    borderRadius: 16,
+    backgroundColor: "#f3f3f3",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 10,
   },
-  itemName: {
-    fontSize: 14,
-    fontWeight: 'bold',
+  image: {
+    width: 60,
+    height: 60,
+    resizeMode: "contain",
   },
-  itemType: {
-    fontSize: 12,
-    color: 'gray',
+  name: {
+    fontSize: 15,
+    fontWeight: "bold",
+    color: "#222",
+    textAlign: "center",
+    marginBottom: 2,
   },
-  itemPoints: {
+  categoryCard: {
     fontSize: 12,
-    fontWeight: 'bold',
-    marginTop: 5,
+    color: "#6c6c6c",
+    textAlign: "center",
+    marginBottom: 2,
+  },
+  pointsCard: {
+    fontSize: 13,
+    color: "#1db954",
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 6,
   },
   addButton: {
-    marginTop: 10,
-    padding: 5,
-    backgroundColor: '#4CAF50',
-    borderRadius: 5,
+    backgroundColor: "#4CAF50",
+    paddingVertical: 6,
+    borderRadius: 10,
+    alignItems: "center",
+    marginTop: 8,
+    width: "100%",
   },
   addButtonText: {
-    color: 'white',
+    color: "white",
+    fontSize: 13,
+    fontWeight: "bold",
   },
-  emptyContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  modalContainer: {
+  modal: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    padding: 20,
+    paddingTop: 60,
+    paddingHorizontal: 24,
+    backgroundColor: "#fff",
+    alignItems: "center",
   },
   modalImage: {
     width: 200,
     height: 200,
+    resizeMode: "contain",
+    marginBottom: 16,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginVertical: 10,
-  },
-  modalText: {
-    fontSize: 16,
-    color: 'gray',
-  },
-  modalPoints: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginTop: 10,
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 6,
+    textAlign: "center",
   },
   modalDescription: {
-    marginTop: 10,
     fontSize: 14,
-    textAlign: 'center',
+    color: "#555",
+    textAlign: "center",
+    marginTop: 10,
+    lineHeight: 20,
   },
   modalButton: {
-    marginTop: 20,
-    padding: 10,
-    backgroundColor: '#4CAF50',
-    borderRadius: 5,
+    marginTop: 24,
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 8,
   },
   modalButtonText: {
-    color: 'white',
-  },
-  listContainer: {
-    paddingBottom: 30,
+    color: "white",
+    fontWeight: "600",
   },
 });
 

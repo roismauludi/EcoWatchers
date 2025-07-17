@@ -3,12 +3,14 @@ import { Modal, Button, Text, View, ScrollView, Image, StyleSheet, TextInput, To
 import { Picker } from '@react-native-picker/picker';
 import { AntDesign, Feather } from '@expo/vector-icons';
 import moment from 'moment';
-import CONFIG from './../config';
+import CONFIG from '../config';
 import { getAuth } from "firebase/auth";
-import { useRoute } from '@react-navigation/native';
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
-import { RootStackParamList } from "../types";
+import { RootStackParamList } from "../../utils/types";
 import { getFirestore, collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from '@expo/vector-icons';
 
 const db = getFirestore();
 
@@ -20,15 +22,18 @@ interface Address {
   'kota-kabupaten': string;
   Detail_Alamat: string;
   Nama: string;
+  Blok_No?: string; // Added Blok_No
+  rtRw?: string; // Added rtRw
 }
 
 interface PickupItem {
-  itemId: string;
+  id: string;
   name: string;
   type: string;
   description: string;
   points: number;
   image: string;
+  quantity?: number; // Added quantity field
 }
 
 interface Pickup {
@@ -81,6 +86,7 @@ const formatScheduleDate = (isoDate: string) => {
 
 const DetailKurirScreen = () => {
   const route = useRoute<DetailKurirRouteProp>(); // Menggunakan tipe yang sudah didefinisikan
+  const navigation = useNavigation();
   const { queueNumber } = route.params; 
   console.log('Route params:', route.params); // Melihat parameter yang diterima
   console.log('Queue number yang diterima:', queueNumber);
@@ -99,6 +105,13 @@ const DetailKurirScreen = () => {
   const [newQuantity, setNewQuantity] = useState<number>(0);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  // Tambahkan state untuk item yang sedang diedit quantity-nya
+  const [editQuantityModalOpen, setEditQuantityModalOpen] = useState(false);
+  const [editQuantityItem, setEditQuantityItem] = useState<PickupItem | null>(null);
+  const [editQuantityValue, setEditQuantityValue] = useState<number>(0);
+  // Tambahkan state untuk tracking perubahan quantity oleh kurir
+  const [changedQuantities, setChangedQuantities] = useState<string[]>([]);
+  const [editQuantityValueStr, setEditQuantityValueStr] = useState<string>('');
 
   useEffect(() => {
     let unsubscribePickup: () => void;
@@ -124,7 +137,7 @@ const DetailKurirScreen = () => {
                 unsubscribePickup = onSnapshot(pickupQuery, async (querySnapshot) => {
                     if (!querySnapshot.empty) {
                         const pickupDoc = querySnapshot.docs[0];
-                        const pickupData = pickupDoc.data();
+                        const pickupData = pickupDoc.data() as Pickup; // casting agar tidak error
                         const id = pickupDoc.id;
 
                         console.log('pickupId yang ditemukan:', id);
@@ -152,30 +165,16 @@ const DetailKurirScreen = () => {
 
                         unsubscribeTrack = onSnapshot(trackQuery, (trackSnapshot) => {
                             if (!trackSnapshot.empty) {
-                                const trackData = trackSnapshot.docs[0].data(); // Ambil data dari dokumen pertama
-                                if (trackData && trackData.statuses) {
-                                    const statuses = trackData.statuses;
-
-                                    // Periksa apakah statuses tidak kosong
-                                    if (statuses.length > 0) {
-                                        const sortedStatuses = statuses.sort((a, b) => b.timestamp.seconds - a.timestamp.seconds);
-                                        const latestStatus = sortedStatuses[0];
-
-                                        // Pastikan latestStatus ada sebelum mengakses status
-                                        if (latestStatus) {
-                                            setTrackStatus(latestStatus.status); // Menyimpan status terbaru kurir
-                                        } else {
-                                            console.log('latestStatus tidak ditemukan.');
-                                        }
-                                    } else {
-                                        console.log('statuses kosong, tidak ada status terbaru.');
-                                        setTrackStatus('Status belum diperbarui'); // Contoh status default
-                                    }
+                                const trackData = trackSnapshot.docs[0].data();
+                                if (trackData && trackData.statuses && trackData.statuses.length > 0) {
+                                    // Ambil status terakhir dari array statuses
+                                    const latestStatus = trackData.statuses[trackData.statuses.length - 1].status;
+                                    setTrackStatus(latestStatus);
                                 } else {
-                                    console.log('Track data tidak memiliki statuses.');
+                                    setTrackStatus(""); // Track baru, belum ada status
                                 }
                             } else {
-                                console.log('Track data tidak ditemukan.');
+                                setTrackStatus(""); // Tidak ada track
                             }
                         });
                     } else {
@@ -198,7 +197,7 @@ const DetailKurirScreen = () => {
     fetchData();
 }, [queueNumber]);
   
-  const updateStatus = async (pickupId, newStatus) => {
+  const updateStatus = async (pickupId: string, newStatus: string) => {
     console.log('pickupId yang akan dikirim:', pickupId); // Log pickupId yang akan dikirim
     try {
       const response = await fetch(`${CONFIG.API_URL}/api/updatestatus/${pickupId}`, {
@@ -222,7 +221,7 @@ const DetailKurirScreen = () => {
     }
   };
   
-const updateStatusTrack = async (pickupId, newStatus) => {
+const updateStatusTrack = async (pickupId: string, newStatus: string) => {
     try {
       const response = await fetch(`${CONFIG.API_URL}/api/update-track-status`, {
         method: 'PUT',
@@ -245,50 +244,66 @@ const updateStatusTrack = async (pickupId, newStatus) => {
     }
   };
 
+  // Tambahkan fungsi untuk urutan status track
+  const TRACK_STATUS_ORDER = [
+    'Kurir akan menjemput sampah Anda',
+    'Kurir sedang dalam perjalanan',
+    'Kurir tiba di lokasi',
+  ];
+
   const handleTrackStatusChange = () => {
     if (pickupId && newStatus) {
-      updateStatusTrack(pickupId, newStatus); // Mengirim status baru
+      // Cek urutan status
+      const currentIdx = TRACK_STATUS_ORDER.indexOf(trackStatus);
+      const newIdx = TRACK_STATUS_ORDER.indexOf(newStatus);
+      if (newIdx > currentIdx) {
+        updateStatusTrack(pickupId, newStatus); // Mengirim status baru
+      } else {
+        alert('Tidak bisa kembali ke status sebelumnya!');
+      }
     } else {
       alert('Status tidak boleh kosong');
     }
   };
 
-  const updateItemQuantity = async (pickupId, itemId, quantity) => {
-    if (!pickupId || !itemId || quantity === undefined) {
-        alert('pickupId, itemId, dan newQuantity harus diberikan'); // Tampilkan alert jika salah satu tidak ada
-        return; // Keluar dari fungsi jika parameter tidak valid
+  const updateItemQuantity = async (pickupId: string, itemId: string, quantity: number) => {
+    if (!pickupId || !itemId || quantity === undefined || quantity === null) {
+      console.log('DEBUG updateItemQuantity: pickupId:', pickupId, 'itemId:', itemId, 'quantity:', quantity);
+      alert('pickupId, itemId, dan newQuantity harus diberikan dan quantity harus lebih dari 0.');
+      return;
     }
 
     const url = `${CONFIG.API_URL}/api/update-quantity/${itemId}`;
-    console.log("URL:", url); // Debugging URL yang dikirimkan
+    console.log('DEBUG updateItemQuantity URL:', url, 'pickupId:', pickupId, 'itemId:', itemId, 'quantity:', quantity);
 
     try {
-        const response = await fetch(url, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ pickupId, itemId, newQuantity: quantity }), // Pastikan pickupId dan itemId juga dikirimkan
-        });
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ pickupId, newQuantity: Number(quantity) }), // Pastikan pickupId dan itemId juga dikirimkan
+      });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Error response:', errorText); // Tampilkan respons error
-            alert(`Error: ${errorText}`);
-            return;
-        }
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText); // Tampilkan respons error
+        alert(`Error: ${errorText}`);
+        return;
+      }
 
-        const result = await response.json();
-        alert(result.message);
-        setQuantityModalOpen(false); // Close modal after successful update
+      const result = await response.json();
+      console.log('DEBUG updateItemQuantity response:', result);
+      alert(result.message);
+      // setQuantityModalOpen(false); // Close modal after successful update - This was for the main quantity modal
 
-        // Setelah quantity berhasil diubah, update status ke "Selesai"
-        updateStatus(pickupId, 'Selesai');
+      // Setelah quantity berhasil diubah, update status ke "Selesai"
+      // updateStatus(pickupId, 'Selesai'); // This was for the main status update
     } catch (error) {
-        console.error('Error updating item quantity:', error);
-        alert('Terjadi kesalahan saat memperbarui quantity');
+      console.error('Error updating item quantity:', error);
+      alert('Terjadi kesalahan saat memperbarui quantity');
     }
-};
+  };
 
   const openQuantityModal = () => {
     setQuantityModalOpen(true);
@@ -339,6 +354,73 @@ const updateStatusTrack = async (pickupId, newStatus) => {
     }
   };
 
+  // Fungsi untuk membuka modal edit quantity per item
+  const openEditQuantityModal = (item: PickupItem) => {
+    setEditQuantityItem(item);
+    setEditQuantityValueStr(item.quantity ? item.quantity.toString() : ''); // Pastikan field quantity ada di item
+    setEditQuantityModalOpen(true);
+  };
+
+  const closeEditQuantityModal = () => {
+    setEditQuantityModalOpen(false);
+    setEditQuantityItem(null);
+    setEditQuantityValueStr('');
+  };
+
+  // Fungsi update quantity per item (validasi di sini)
+  const handleUpdateItemQuantity = () => {
+    console.log('DEBUG STATE:', { pickupId, editQuantityItem, editQuantityValueStr });
+    if (pickupId && editQuantityItem && editQuantityItem.id) {
+      const normalized = editQuantityValueStr.replace(',', '.');
+      const value = parseFloat(normalized);
+      if (!isNaN(value) && value > 0) {
+        console.log('FRONTEND DEBUG update quantity:', {
+          pickupId,
+          itemId: editQuantityItem.id,
+          newQuantity: value
+        });
+        fetch(`${CONFIG.API_URL}/api/update-quantity/${editQuantityItem.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pickupId, newQuantity: value })
+        })
+          .then(async (response) => {
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error('Error response:', errorText);
+              alert(`Error: ${errorText}`);
+              return;
+            }
+            const result = await response.json();
+            console.log('DEBUG updateItemQuantity response:', result);
+            alert(result.message);
+            setChangedQuantities((prev) => prev.includes(editQuantityItem.id) ? prev : [...prev, editQuantityItem.id]);
+            closeEditQuantityModal();
+          })
+          .catch((error) => {
+            console.error('Error updating item quantity:', error);
+            alert('Terjadi kesalahan saat memperbarui quantity');
+          });
+      } else {
+        alert('Quantity harus berupa angka lebih dari 0.');
+      }
+    } else {
+      alert('pickupId, itemId, dan newQuantity harus diberikan dan quantity harus lebih dari 0.');
+    }
+  };
+
+  // Fungsi untuk cek apakah semua item sudah diubah quantity-nya oleh kurir
+  const allItemsQuantityChanged = pickupData?.items && pickupData.items.length > 0 && pickupData.items.every(item => changedQuantities.includes(item.id));
+
+  // Fungsi untuk handle penyetoran selesai
+  const handlePenyetoranSelesai = () => {
+    if (allItemsQuantityChanged) {
+      updateStatus(pickupId || '', 'Selesai');
+    } else {
+      alert('Semua quantity item harus diisi dan lebih dari 0 sebelum menyelesaikan penyetoran.');
+    }
+  };
+
   if (loading) {
     return <Text>Memuat data...</Text>;
   }
@@ -349,6 +431,13 @@ const updateStatusTrack = async (pickupId, newStatus) => {
 
   return (
     <ScrollView style={styles.container}>
+      {/* Header dengan tombol back dan judul */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 16, marginBottom: 8 }}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 6, marginRight: 8, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.07)' }}>
+          <Ionicons name="arrow-back" size={26} color="#00796b" />
+        </TouchableOpacity>
+        <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#00796b' }}>Detail Penjemputan</Text>
+      </View>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Alamat Penjemputan</Text>
         <View style={styles.addressContainer}>
@@ -360,6 +449,14 @@ const updateStatusTrack = async (pickupId, newStatus) => {
               <Text style={styles.addressDetails}>
                 {address.Detail_Alamat}, {address.Kecamatan}, {address['kota-kabupaten']} {address.Kode_pos}
               </Text>
+              {/* Tambahkan Blok_No dan rtRw jika ada */}
+              {(address.Blok_No || address.rtRw) && (
+                <Text style={styles.addressDetails}>
+                  {address.Blok_No ? `Blok: ${address.Blok_No}` : ''}
+                  {address.Blok_No && address.rtRw ? ' | ' : ''}
+                  {address.rtRw ? `RT/RW: ${address.rtRw}` : ''}
+                </Text>
+              )}
               <Text style={styles.addressDetails}>{address.No_tlp}</Text>
             </>
           )}
@@ -368,14 +465,29 @@ const updateStatusTrack = async (pickupId, newStatus) => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Item Penjemputan</Text>
-        <View style={styles.card}>
-          <Image source={getImageSource(selectedItem?.image || "")} style={styles.cardImage} />
-          <View style={styles.cardContent}>
-            <Text style={styles.cardTitle}>{selectedItem?.name}</Text>
-            <Text style={styles.cardType}>{selectedItem?.type}</Text>
-            <Text style={styles.cardPoints}>{selectedItem?.points} Points</Text>
-          </View>
-        </View>
+        {/* Tampilkan semua item penjemputan */}
+        {pickupData?.items && pickupData.items.length > 0 ? (
+          pickupData.items.map((item, idx) => (
+            <View style={styles.card} key={item.id || idx}>
+              <Image source={getImageSource(item?.image || "")}
+                style={styles.cardImage} />
+              <View style={styles.cardContent}>
+                <Text style={styles.cardTitle}>{item?.name}</Text>
+                <Text style={styles.cardType}>{item?.type}</Text>
+                <Text style={styles.cardPoints}>{item?.points} Points</Text>
+                <Text style={styles.cardType}>Quantity: {item.quantity || 0}</Text>
+                <TouchableOpacity
+                  style={{ marginTop: 8, backgroundColor: '#00796b', padding: 8, borderRadius: 6, alignSelf: 'flex-start' }}
+                  onPress={() => openEditQuantityModal(item)}
+                >
+                  <Text style={{ color: 'white', fontWeight: 'bold' }}>Ubah Quantity</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))
+        ) : (
+          <Text>Tidak ada item penjemputan.</Text>
+        )}
       </View>
 
       <View style={styles.section}>
@@ -404,26 +516,35 @@ const updateStatusTrack = async (pickupId, newStatus) => {
       </View>
       
       {pickupData?.status === "Pending" && (
-            <Button 
-                title="Ubah Status ke Dijemput" 
-                onPress={() => updateStatus(pickupId, 'Dijemput')} // Menggunakan pickupId
-            />
-        )}
-    {/* Status update button */}
-    {pickupData?.status === "Ditimbang" && (
-     <Button title="Ubah Quantity Item" onPress={openQuantityModal} />
-    )}
-
-    {/* Button untuk update status ke Ditimbang hanya jika status bukan "Ditimbang" */}
-    {pickupData?.status !== "Ditimbang" && pickupData?.status !== "Selesai" && trackStatus === "Kurir tiba di lokasi" && (
-        <Button
-          title="Update Status ke Ditimbang"
-          onPress={() => updateStatus(pickupId, "Ditimbang")} // Mengupdate status ke "Ditimbang"
-        />
-    )}
+  <TouchableOpacity
+    style={styles.updateStatusButton}
+    onPress={() => updateStatus(pickupId!, 'Dijemput')}
+  >
+    <Feather name="truck" size={20} color="white" style={{ marginRight: 8 }} />
+    <Text style={styles.updateStatusButtonText}>Ubah Status ke Dijemput</Text>
+  </TouchableOpacity>
+)}
+{pickupData?.status === "Ditimbang" && allItemsQuantityChanged && (
+  <TouchableOpacity
+    style={styles.updateStatusButton}
+    onPress={handlePenyetoranSelesai}
+  >
+    <Feather name="check-circle" size={20} color="white" style={{ marginRight: 8 }} />
+    <Text style={styles.updateStatusButtonText}>Penyetoran Selesai</Text>
+  </TouchableOpacity>
+)}
+{pickupData?.status !== "Ditimbang" && pickupData?.status !== "Selesai" && trackStatus === "Kurir tiba di lokasi" && (
+  <TouchableOpacity
+    style={styles.updateStatusButton}
+    onPress={() => updateStatus(pickupId!, "Ditimbang")}
+  >
+    <Feather name="check-circle" size={20} color="white" style={{ marginRight: 8 }} />
+    <Text style={styles.updateStatusButtonText}>Update Status ke Ditimbang</Text>
+  </TouchableOpacity>
+)}
 
        {/* Button untuk membuka modal */}
-       {pickupData && pickupData.status === "Dijemput" && pickupData.trackStatus !== "Kurir tiba di lokasi" && (
+       {pickupData && pickupData.status === "Dijemput" && trackStatus !== "Kurir tiba di lokasi" && (
          <TouchableOpacity
            style={styles.updateStatusButton}
            onPress={openTrackStatusModal}
@@ -470,18 +591,16 @@ const updateStatusTrack = async (pickupId, newStatus) => {
                   onValueChange={(itemValue) => setNewStatus(itemValue)}
                 >
                   <Picker.Item label="Pilih Status Track" value="" />
-                  <Picker.Item 
-                    label="Kurir akan menjemput sampah Anda" 
-                    value="Kurir akan menjemput sampah Anda" 
-                  />
-                  <Picker.Item 
-                    label="Kurir sedang dalam perjalanan" 
-                    value="Kurir sedang dalam perjalanan" 
-                  />
-                  <Picker.Item 
-                    label="Kurir tiba di lokasi" 
-                    value="Kurir tiba di lokasi" 
-                  />
+                  {/* Logic dinamis untuk opsi status track */}
+                  {(!trackStatus || trackStatus === null || trackStatus === "") && (
+                    <Picker.Item label="Kurir akan menjemput sampah Anda" value="Kurir akan menjemput sampah Anda" />
+                  )}
+                  {trackStatus === "Kurir akan menjemput sampah Anda" && (
+                    <Picker.Item label="Kurir sedang dalam perjalanan" value="Kurir sedang dalam perjalanan" />
+                  )}
+                  {trackStatus === "Kurir sedang dalam perjalanan" && (
+                    <Picker.Item label="Kurir tiba di lokasi" value="Kurir tiba di lokasi" />
+                  )}
                 </Picker>
               </View>
 
@@ -520,21 +639,12 @@ const updateStatusTrack = async (pickupId, newStatus) => {
                     onChangeText={(text) => {
                         // Validasi input agar hanya angka dan satu titik desimal yang diperbolehkan
                         if (/^\d*\.?\d*$/.test(text)) {
-                            setNewQuantity(parseFloat(text) || 0);
+                            setNewQuantity(text === '' ? 0 : parseFloat(text));
                         }
                     }}
-                    keyboardType="numeric" // Gunakan numeric untuk angka saja
+                    keyboardType="numeric"
                     style={styles.quantityInput}
                     placeholder="Masukkan Quantity Baru (contoh: 1.5)"
-                    onKeyPress={({ nativeEvent }) => {
-                        // Jika pengguna menekan tombol titik
-                        if (nativeEvent.key === '.') {
-                            // Hanya satu titik desimal yang boleh ada dalam input
-                            if (!newQuantity.toString().includes('.')) {
-                                setNewQuantity(prev => prev + '.');
-                            }
-                        }
-                    }}
                 />
                 <View style={styles.modalFooter}>
                     <Button title="Batal" onPress={closeQuantityModal} />
@@ -545,9 +655,9 @@ const updateStatusTrack = async (pickupId, newStatus) => {
                             if (pickupData && selectedItem) {
                                 if (newQuantity > 0) { // Validasi angka positif
                                     console.log('pickupId:', pickupId);
-                                    console.log('itemId:', selectedItem.itemId);
+                                    console.log('itemId:', selectedItem.id);
                                     console.log('newQuantity:', newQuantity);
-                                    updateItemQuantity(pickupId, selectedItem.itemId, newQuantity);
+                                    updateItemQuantity(pickupId!, selectedItem.id, newQuantity);
                                 } else {
                                     alert("Quantity harus lebih dari 0.");
                                 }
@@ -561,6 +671,29 @@ const updateStatusTrack = async (pickupId, newStatus) => {
         </View>
     </Modal>
 )}
+
+      {/* Modal untuk edit quantity per item */}
+      {editQuantityModalOpen && (
+        <Modal visible={editQuantityModalOpen} onRequestClose={closeEditQuantityModal} transparent={true}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Ubah Quantity Item</Text>
+              <Text style={{ marginBottom: 8 }}>{editQuantityItem?.name}</Text>
+              <TextInput
+                value={editQuantityValueStr}
+                onChangeText={setEditQuantityValueStr}
+                keyboardType="decimal-pad"
+                style={styles.quantityInput}
+                placeholder="Masukkan Quantity Baru (contoh: 1.5 atau 0,5)"
+              />
+              <View style={styles.modalFooter}>
+                <Button title="Batal" onPress={closeEditQuantityModal} />
+                <Button title="Simpan" onPress={handleUpdateItemQuantity} />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
 
       {pickupData?.status === "Pending" && (
         <TouchableOpacity 
@@ -750,51 +883,30 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 10,
-    width: '80%',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  reasonInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 15,
-    textAlignVertical: 'top',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  modalButton: {
+  modalInfo: {
+    marginBottom: 16,
+    backgroundColor: '#f5f5f5',
     padding: 12,
     borderRadius: 8,
-    width: '48%',
+  },
+  modalInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 4,
   },
-  cancelButtonModal: {
-    backgroundColor: '#e57373',
+  modalLabel: {
+    fontSize: 14,
+    color: '#666',
+    flex: 1,
   },
-  submitButtonModal: {
-    backgroundColor: '#00796b',
-  },
-  modalButtonText: {
-    color: 'white',
+  modalValue: {
+    fontSize: 14,
     fontWeight: 'bold',
+    color: '#00796b',
+    flex: 2,
+    textAlign: 'right',
   },
   updateStatusButton: {
     backgroundColor: '#00796b',
@@ -827,10 +939,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
   },
-  select: {
-    height: 50,
-    width: '100%',
-  },
   modalButton: {
     padding: 12,
     borderRadius: 8,
@@ -848,62 +956,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  reasonInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 15,
+    textAlignVertical: 'top',
   },
-  modalContent: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 12,
-    width: '90%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#00796b',
-  },
-  modalDescription: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 16,
-  },
-  modalFooter: {
+  modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 20,
-  },
-  boldText: {
-    fontWeight: 'bold',
-    color: '#00796b',
-  },
-  modalInfo: {
-    marginBottom: 16,
-    backgroundColor: '#f5f5f5',
-    padding: 12,
-    borderRadius: 8,
-  },
-  modalInfoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-    paddingHorizontal: 4,
-  },
-  modalLabel: {
-    fontSize: 14,
-    color: '#666',
-    flex: 1,
-  },
-  modalValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#00796b',
-    flex: 2,
-    textAlign: 'right',
   },
 });
 

@@ -1,17 +1,24 @@
-import React from "react";
+import React, { useState } from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { createStackNavigator } from "@react-navigation/stack";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
-import { SelectedItemsProvider } from "../(tabs)/context/SelectedItemsContext";
+import { SelectedItemsProvider } from "../../context/SelectedItemsContext";
+import { RouteProp } from "@react-navigation/native";
+import { RootStackParamList, TabParamList } from "../../utils/types";
+import { View, StatusBar } from "react-native";
+import {
+  useSafeAreaInsets,
+  SafeAreaView,
+} from "react-native-safe-area-context";
 
+// Import screens
 import LoginScreen from "../auth/login";
 import RegisterScreen from "../auth/register";
-import DashboardScreen from "./dashboard"; // Your Dashboard Screen
-import TongScreen from "./TongSampah"; // Other screens
+import DashboardScreen from "./dashboard";
+import TongScreen from "./TongSampah";
 import RiwayatScreen from "../screens/RiwayatScreen";
-import EducationScreen from "./edukasisampah";
-import CatalogScreen from "../screens/CatalogScreen"; // Import CatalogScreen
-import DropPointScreen from "../screens/DropPointScreen";
+import ChannelsScreen from "../screens/ChannelsScreen";
+import CatalogScreen from "../screens/CatalogScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import AddAddressScreen from "../screens/AddAddressScreen";
 import PenyetoranScreen from "../screens/PenyetoranScreen";
@@ -25,19 +32,39 @@ import DibatalkanScreen from "../screens/DibatalkanScreen";
 import TukarPointScreen from "../screens/TukarPointScreen";
 import KurirScreen from "../screens/KurirScreen";
 import DetailKurirScreen from "../screens/DetailKurirScreen";
+import EditProfileScreen from "../screens/EditProfileScreen";
+import SecurityScreen from "../screens/SecurityScreen";
+import CampaignDetailScreen from "../screens/CampaignDetailScreen";
+import AllCampaignsScreen from "../screens/AllCampaignScreen";
+import AdminDashboardScreen from "../screens/AdminDashboardScreen";
+import DaftarAlamatScreen from "../screens/DaftarAlamatScreen";
 
-const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator();
+
+const Tab = createBottomTabNavigator<TabParamList>();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 // Tab navigation
 function BottomTabs() {
-  const userId = "userId-example"; // Ganti dengan logika untuk mendapatkan userId dari konteks/akses lainnya
+  const userId = "userId-example";
+  const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
       initialRouteName="Home"
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
+      screenOptions={({
+        route,
+      }: {
+        route: RouteProp<TabParamList, keyof TabParamList>;
+      }) => ({
+        tabBarIcon: ({
+          focused,
+          color,
+          size,
+        }: {
+          focused: boolean;
+          color: string;
+          size: number;
+        }) => {
           if (route.name === "Home") {
             return <Ionicons name={focused ? "home" : "home-outline"} size={size} color={color} />;
           } else if (route.name === "Tong") {
@@ -49,183 +76,183 @@ function BottomTabs() {
           }
           return null;
         },
-        tabBarActiveTintColor: "#1DB954",
-        tabBarInactiveTintColor: "gray",
+        tabBarActiveTintColor: "#000",
+        tabBarInactiveTintColor: "#000",
+        tabBarStyle: {
+          position: "absolute",
+          height: 60,
+          paddingTop: 4,
+          paddingBottom: insets.bottom,
+          backgroundColor: "#fff",
+          borderTopWidth: 0,
+          elevation: 0,
+        },
+        tabBarLabelStyle: { fontSize: 12 },
+        tabBarItemStyle: {
+          justifyContent: "center",
+          alignItems: "center",
+          paddingTop: 4,
+        },
+        headerShown: false,
+        tabBarShowLabel: true,
       })}
     >
-      <Tab.Screen name="Home" options={{ headerShown: false }} component={DashboardScreen} />
-      <Tab.Screen name="Tong" options={{ headerShown: false }} component={TongScreen} />
+      <Tab.Screen name="Home" component={DashboardScreen} options={{ tabBarLabel: 'Home' }} />
+      <Tab.Screen name="Tong" component={TongScreen} options={{ tabBarLabel: 'Tong' }} />
       <Tab.Screen
         name="Riwayat"
         component={RiwayatScreen}
-        initialParams={{ userId }}  // Kirim userId sebagai parameter
+        initialParams={{ userId }}
+        options={{ tabBarLabel: 'Riwayat' }}
       />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: 'Profile' }} />
     </Tab.Navigator>
   );
 }
 
-
 // Stack navigation
 export default function MainTabs() {
-  console.log("Rendering MainTabs Stack Navigator");
+  const insets = useSafeAreaInsets();
 
   return (
     <SelectedItemsProvider>
-      <Stack.Navigator
-        initialRouteName="Login"
-        screenListeners={{
-          state: (e) => {
-            console.log("Stack State Changed:", e.data.state);
-          },
-        }}
-      >
-        <Stack.Screen
-          name="Login"
-          component={LoginScreen}
-          options={{
-            headerShown: false,
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="transparent"
+        translucent
+      />
+      <SafeAreaView style={{ flex: 1 }}>
+        <Stack.Navigator
+          initialRouteName="Login"
+          screenOptions={{ headerShown: false }}
+          screenListeners={{
+            state: (e: { data: { state: any } }) => {
+              console.log("Stack State Changed:", e.data.state);
+            },
           }}
-          listeners={{
-            focus: () => console.log("Navigated to Login"),
-          }}
-        />
-        <Stack.Screen
-          name="Register"
-          component={RegisterScreen}
-          options={{ title: "Register" }}
-          listeners={{
-            focus: () => console.log("Navigated to Register"),
-          }}
-        />
-        <Stack.Screen
-          name="MainTabs"
-          component={BottomTabs}
-          options={{ headerShown: false }}
-          listeners={{
-            focus: () => console.log("Navigated to MainTabs"),
-          }}
-        />
-        <Stack.Screen
-          name="KurirDashboard"
-          component={KurirScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="Detail"
-          component={DetailKurirScreen}
-          options={{ title: "Detail" }}
-          listeners={{
-            focus: () => console.log("Navigated to Detail"),
-          }}
-        />
-        <Stack.Screen
-          name="Catalog"
-          component={CatalogScreen}
-          options={{ title: "Katalog Sampah" }}
-          listeners={{
-            focus: () => console.log("Navigated to Catalog"),
-          }}
-        />
-        <Stack.Screen
-          name="Tong"
-          component={TongScreen}
-          options={{ title: "Tong Sampah" }}
-          listeners={{
-            focus: () => console.log("Navigated to Tong"),
-          }}
-        />
-        <Stack.Screen
-          name="Penyetoran"
-          component={PenyetoranScreen}
-          options={{ title: "Penyetoran" }}
-          listeners={{
-            focus: () => console.log("Navigated to Penyetoran"),
-          }}
-        />
-        <Stack.Screen
-          name="AddAddress"
-          component={AddAddressScreen}
-          options={{ title: "Tambah Alamat" }}
-          listeners={{
-            focus: () => console.log("Navigated to AddAddress"),
-          }}
-        />
-        <Stack.Screen
-          name="PickUp"
-          component={PickupScreen}
-          options={{ title: "Pick Up" }}
-          listeners={{
-            focus: () => console.log("Navigated to PickUp"),
-          }}
-        />
-        <Stack.Screen
-          name="Rincian"
-          component={RincianScreen}
-          options={{ title: "Rincian" }}
-          listeners={{
-            focus: () => console.log("Navigated to Rincian"),
-          }}
-        />
-        <Stack.Screen
-          name="Dijemput"
-          component={DijemputScreen}
-          options={{ title: "Dijemput" }}
-          listeners={{
-            focus: () => console.log("Navigated to Dijemput"),
-          }}
-        />
-        <Stack.Screen
-          name="Track"
-          component={TrackScreen}
-          options={{ title: "Track" }}
-          listeners={{
-            focus: () => console.log("Navigated to Track"),
-          }}
-        />
-        <Stack.Screen
-          name="Ditimbang"
-          component={DitimbangScreen}
-          options={{ title: "Ditimbang" }}
-          listeners={{
-            focus: () => console.log("Navigated to Ditimbang"),
-          }}
-        />
-        <Stack.Screen
-          name="Selesai"
-          component={SelesaiScreen}
-          options={{ title: "Selesai" }}
-          listeners={{
-            focus: () => console.log("Navigated to Selesai"),
-          }}
-        />
-        <Stack.Screen
-          name="Dibatalkan"
-          component={DibatalkanScreen}
-          options={{ title: "Dibatalkan" }}
-          listeners={{
-            focus: () => console.log("Navigated to Dibatalkan"),
-          }}
-        />
-        <Stack.Screen
-          name="TukarPoint"
-          component={TukarPointScreen}
-          options={{ title: "TukarPoint" }}
-          listeners={{
-            focus: () => console.log("Navigated to TukarPoint"),
-          }}
-        />
-        <Stack.Screen
-          name="EditProfile"
-          component={require('../screens/EditProfileScreen').default}
-          options={{ title: "Edit Profil" }}
-        />
-        <Stack.Screen
-          name="Security"
-          component={require('../screens/SecurityScreen').default}
-          options={{ title: "Pengaturan Keamanan" }}
-        />
-      </Stack.Navigator>
+        >
+          <Stack.Screen
+            name="Login"
+            component={LoginScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Register"
+            component={RegisterScreen}
+            options={{ title: "Register" }}
+          />
+          <Stack.Screen
+            name="MainTabs"
+            component={BottomTabs}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="KurirDashboard"
+            component={KurirScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Detail"
+            component={DetailKurirScreen}
+            options={{ title: "Detail" }}
+          />
+          <Stack.Screen
+            name="Catalog"
+            component={CatalogScreen}
+            options={{ title: "Katalog Sampah" }}
+          />
+          <Stack.Screen
+            name="Channels"
+            component={ChannelsScreen}
+            options={{ title: "Channels" }}
+          />
+          <Stack.Screen
+            name="Tong"
+            component={TongScreen}
+            options={{ title: "Tong Sampah" }}
+          />
+          <Stack.Screen
+            name="Penyetoran"
+            component={PenyetoranScreen}
+            options={{ title: "Penyetoran" }}
+          />
+          <Stack.Screen
+            name="AddAddress"
+            component={AddAddressScreen}
+            options={{ title: "Tambah Alamat" }}
+          />
+          <Stack.Screen
+            name="PickUp"
+            component={PickupScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Rincian"
+            component={RincianScreen}
+            options={{ title: "Rincian", headerShown: true }}
+          />
+          <Stack.Screen
+            name="Dijemput"
+            component={DijemputScreen}
+            options={{ title: "Dijemput" }}
+          />
+          <Stack.Screen
+            name="Track"
+            component={TrackScreen}
+            options={{ title: "Track", headerShown: true }}
+          />
+          <Stack.Screen
+            name="Ditimbang"
+            component={DitimbangScreen}
+            options={{ title: "Ditimbang" }}
+          />
+          <Stack.Screen
+            name="Selesai"
+            component={SelesaiScreen}
+            options={{ title: "Selesai" }}
+          />
+          <Stack.Screen
+            name="Dibatalkan"
+            component={DibatalkanScreen}
+            options={{ title: "Dibatalkan" }}
+          />
+          <Stack.Screen
+            name="TukarPoint"
+            component={TukarPointScreen}
+            options={{ title: "Tukar Point" }}
+          />
+          <Stack.Screen
+            name="EditProfile"
+            component={EditProfileScreen}
+            options={{ title: "Edit Profil" }}
+          />
+          <Stack.Screen
+            name="Security"
+            component={SecurityScreen}
+            options={{ title: "Pengaturan Keamanan" }}
+          />
+          <Stack.Screen
+            name="AllCampaign"
+            component={AllCampaignsScreen}
+            options={{ title: "Semua Kampanye" }}
+          />
+          <Stack.Screen
+            name="CampaignDetail"
+            component={CampaignDetailScreen}
+            options={{ title: "Detail Campaign" }}
+          />
+          <Stack.Screen
+            name="AdminDashboard"
+            component={AdminDashboardScreen}
+            options={{ title: "Dashboard Admin" }}
+          />
+           <Stack.Screen
+            name="DaftarAlamat"
+            component={DaftarAlamatScreen}
+            options={{ title: "Daftar Alamat" }}
+          />
+        </Stack.Navigator>
+      </SafeAreaView>
     </SelectedItemsProvider>
   );
 }

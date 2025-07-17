@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl } from 'react-native';
+import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity, ScrollView, Modal, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import CONFIG from './../config';
+import CONFIG from '../config';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import moment from 'moment';
 
 type Item = {
     description: string;
@@ -49,11 +50,29 @@ const formatNumber = (number: number) => {
     return new Intl.NumberFormat('id-ID').format(number);
 };
 
+const FILTER_OPTIONS = [
+    { label: 'Semua', value: 'all' },
+    { label: 'Hari Ini', value: 'today' },
+    { label: 'Kemarin', value: 'yesterday' },
+    { label: 'Minggu Ini', value: 'thisweek' },
+    { label: 'Bulan Ini', value: 'thismonth' },
+    { label: 'Pilih Bulan...', value: 'custommonth' }, // Tambahan
+];
+
+const monthNames = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+];
+
 const RiwayatScreen: React.FC = () => {
     const [userId, setUserId] = useState<string | null>(null);
     const [data, setData] = useState<DataState | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
+    const [filter, setFilter] = useState<'all' | 'today' | 'yesterday' | 'thisweek' | 'thismonth' | 'custommonth'>('all');
+    const [customMonth, setCustomMonth] = useState<number | null>(null); // 0-11
+    const [customYear, setCustomYear] = useState<number | null>(null);
+    const [showMonthPicker, setShowMonthPicker] = useState(false);
 
     const fetchData = async () => {
         console.log('Fetching data...');
@@ -140,6 +159,45 @@ const RiwayatScreen: React.FC = () => {
         return dateB.getTime() - dateA.getTime();
     });
 
+    // Filter data sesuai pilihan
+    const now = moment();
+    const filteredData = combinedData.filter((item) => {
+        let date: moment.Moment;
+        if (isPenyetoran(item)) {
+            date = moment(item.createdAt);
+        } else {
+            date = moment(item.timestamp);
+        }
+        if (filter === 'today') {
+            return date.isSame(now, 'day');
+        } else if (filter === 'yesterday') {
+            return date.isSame(now.clone().subtract(1, 'day'), 'day');
+        } else if (filter === 'thisweek') {
+            return date.isSame(now, 'week');
+        } else if (filter === 'thismonth') {
+            return date.isSame(now, 'month');
+        } else if (filter === 'custommonth' && customMonth !== null && customYear !== null) {
+            return date.month() === customMonth && date.year() === customYear;
+        }
+        return true;
+    });
+
+    filteredData.sort((a, b) => {
+        let dateA: Date;
+        let dateB: Date;
+        if (isPenyetoran(a)) {
+            dateA = new Date(a.createdAt);
+        } else {
+            dateA = new Date(a.timestamp);
+        }
+        if (isPenyetoran(b)) {
+            dateB = new Date(b.createdAt);
+        } else {
+            dateB = new Date(b.timestamp);
+        }
+        return dateB.getTime() - dateA.getTime();
+    });
+
     if (error) {
         return (
             <View style={styles.errorContainer}>
@@ -158,8 +216,102 @@ const RiwayatScreen: React.FC = () => {
 
     return (
         <View style={styles.container}>
+            <Text style={styles.header}>Riwayat</Text>
+            {/* Filter */}
+            <View style={styles.filterScrollWrapper}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={styles.filterContainer}>
+                        {FILTER_OPTIONS.map(opt => (
+                            <TouchableOpacity
+                                key={opt.value}
+                                style={[
+                                    styles.filterButton,
+                                    filter === opt.value && styles.filterButtonActive
+                                ]}
+                                onPress={() => {
+                                    if (opt.value === 'custommonth') {
+                                        setShowMonthPicker(true);
+                                    } else {
+                                        setFilter(opt.value as any);
+                                    }
+                                }}
+                            >
+                                <Text style={[
+                                    styles.filterButtonText,
+                                    filter === opt.value && styles.filterButtonTextActive
+                                ]}>
+                                    {opt.label}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </ScrollView>
+            </View>
+
+            {/* Modal Picker Bulan & Tahun */}
+            <Modal
+                visible={showMonthPicker}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowMonthPicker(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.monthPickerModal}>
+                        <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 10 }}>Pilih Bulan & Tahun</Text>
+                        <View style={{ flexDirection: 'row', marginBottom: 16 }}>
+                            {/* Picker Bulan */}
+                            <ScrollView style={{ maxHeight: 150 }}>
+                                {monthNames.map((m, idx) => (
+                                    <Pressable
+                                        key={m}
+                                        style={{ padding: 8, backgroundColor: customMonth === idx ? '#4CAF50' : 'transparent', borderRadius: 8 }}
+                                        onPress={() => setCustomMonth(idx)}
+                                    >
+                                        <Text style={{ color: customMonth === idx ? '#fff' : '#333' }}>{m}</Text>
+                                    </Pressable>
+                                ))}
+                            </ScrollView>
+                            {/* Picker Tahun */}
+                            <ScrollView style={{ maxHeight: 150, marginLeft: 16 }}>
+                                {Array.from({ length: 6 }).map((_, i) => {
+                                    const year = now.year() - i;
+                                    return (
+                                        <Pressable
+                                            key={year}
+                                            style={{ padding: 8, backgroundColor: customYear === year ? '#4CAF50' : 'transparent', borderRadius: 8 }}
+                                            onPress={() => setCustomYear(year)}
+                                        >
+                                            <Text style={{ color: customYear === year ? '#fff' : '#333' }}>{year}</Text>
+                                        </Pressable>
+                                    );
+                                })}
+                            </ScrollView>
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+                            <TouchableOpacity
+                                style={{ marginRight: 16 }}
+                                onPress={() => setShowMonthPicker(false)}
+                            >
+                                <Text style={{ color: '#888' }}>Batal</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={{ backgroundColor: '#4CAF50', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 }}
+                                onPress={() => {
+                                    if (customMonth !== null && customYear !== null) {
+                                        setFilter('custommonth');
+                                        setShowMonthPicker(false);
+                                    }
+                                }}
+                            >
+                                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Terapkan</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
             <FlatList
-                data={combinedData}
+                data={filteredData}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => {
                     if ('items' in item) {
@@ -259,6 +411,8 @@ const RiwayatScreen: React.FC = () => {
                         );
                     }
                 }}
+                contentContainerStyle={{ paddingBottom: 100 }}
+                ListFooterComponent={<View style={{ height: 20 }} />}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }
@@ -272,6 +426,13 @@ const styles = StyleSheet.create({
         flex: 1,
         padding: 20,
         backgroundColor: '#fff',
+    },
+    header: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 20,
+        alignSelf: 'center',
     },
     transactionItem: {
         backgroundColor: '#f9f9f9',
@@ -411,6 +572,54 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#00796b',
         marginTop: 2,
+    },
+    filterScrollWrapper: {
+        marginBottom: 10,
+    },
+    filterContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 5,
+        paddingHorizontal: 2,
+    },
+    filterButton: {
+        paddingHorizontal: 18,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#ccc',
+        marginRight: 8,
+        backgroundColor: '#fff',
+    },
+    filterButtonActive: {
+        backgroundColor: '#4CAF50',
+        borderColor: '#4CAF50',
+        shadowColor: '#4CAF50',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    filterButtonText: {
+        fontSize: 14,
+        color: '#333',
+        fontWeight: 'bold',
+    },
+    filterButtonTextActive: {
+        color: '#fff',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    monthPickerModal: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 20,
+        width: 320,
+        elevation: 5,
     },
 });
 

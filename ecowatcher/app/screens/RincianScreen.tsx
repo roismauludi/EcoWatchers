@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
 import moment from 'moment';
-import CONFIG from './../config';
+import CONFIG from '../config';
 import { getAuth } from "firebase/auth";
 import { useRoute } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
-import { RootStackParamList } from "../types";
+import { RootStackParamList } from "../../utils/types";
 
 interface Address {
   Kode_pos: string;
@@ -16,6 +16,8 @@ interface Address {
   'kota-kabupaten': string;
   Detail_Alamat: string;
   Nama: string;
+  Blok_No?: string;
+  rtRw?: string;
 }
 
 interface PickupItem {
@@ -59,7 +61,7 @@ const imageMapping: { [key: string]: any } = {
   "botol_plastik.png": require("../../assets/images/plastik/botol_plastik.png"),
   "ember_plastik.png": require("../../assets/images/plastik/ember_plastik.png"),
   "gelas_plastik.png": require("../../assets/images/plastik/gelas_plastik.png"),
-  'default-sampah': require('../../assets/images/default-sampah.png'),
+  "default-sampah.png": require("../../assets/images/default-sampah.png"),
 };
 
 const getImageSource = (imageName: string) => {
@@ -108,7 +110,7 @@ const RincianPenjemputan = () => {
               setStatus(pickupData.status);
               // Jika ingin item tertentu:
               if (id) {
-                const item = pickupData.items.find((item: any) => item.itemId === id);
+                const item = pickupData.items.find((item: any) => item.itemId === id || item.id === id);
                 setSelectedItem(item || null);
               } else {
                 setSelectedItem(pickupData.items[0] || null);
@@ -159,12 +161,12 @@ const RincianPenjemputan = () => {
     return <Text>Memuat data...</Text>;
   }
 
-  if (!selectedItem) {
+  if (!pickupData || !pickupData.items || pickupData.items.length === 0) {
     return <Text>Item tidak ditemukan.</Text>;
   }
   
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollViewContent}>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Alamat Penjemputan</Text>
         <View style={styles.addressContainer}>
@@ -173,10 +175,22 @@ const RincianPenjemputan = () => {
               <Text style={styles.addressName}>
                 {address.Nama} <Text style={styles.tag}>{address.label_Alamat}</Text>
               </Text>
+              <Text style={styles.addressDetails}>{address.Detail_Alamat || '-'}</Text>
+              {/* Kecamatan, Kota/Kabupaten, Kode Pos dalam satu baris jika ada */}
               <Text style={styles.addressDetails}>
-                {address.Detail_Alamat}, {address.Kecamatan}, {address['kota-kabupaten']} {address.Kode_pos}
+                {address.Kecamatan ? address.Kecamatan + ', ' : ''}
+                {address['kota-kabupaten'] ? address['kota-kabupaten'] + ' ' : ''}
+                {address.Kode_pos || ''}
               </Text>
-              <Text style={styles.addressDetails}>{address.No_tlp}</Text>
+              {/* Blok/No dan RT/RW dalam satu baris jika ada */}
+              {(address.Blok_No || address.rtRw) && (
+                <Text style={styles.addressDetails}>
+                  {address.Blok_No ? `Blok: ${address.Blok_No}` : ''}
+                  {address.Blok_No && address.rtRw ? ' | ' : ''}
+                  {address.rtRw ? `RT/RW: ${address.rtRw}` : ''}
+                </Text>
+              )}
+              <Text style={styles.addressDetails}>{address.No_tlp || '-'}</Text>
             </>
           )}
         </View>
@@ -184,14 +198,16 @@ const RincianPenjemputan = () => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Item Penjemputan</Text>
-        <View style={styles.card}>
-          <Image source={getImageSource(selectedItem.image)} style={styles.cardImage} />
-          <View style={styles.cardContent}>
-            <Text style={styles.cardTitle}>{selectedItem.name}</Text>
-            <Text style={styles.cardType}>{selectedItem.type}</Text>
-            <Text style={styles.cardPoints}>{selectedItem.points} Points</Text>
+        {pickupData.items.map((item, idx) => (
+          <View style={styles.card} key={item.itemId || idx}>
+            <Image source={getImageSource(item.image)} style={styles.cardImage} />
+            <View style={styles.cardContent}>
+              <Text style={styles.cardTitle}>{item.name}</Text>
+              <Text style={styles.cardType}>{item.type}</Text>
+              <Text style={styles.cardPoints}>{item.points} Points</Text>
+            </View>
           </View>
-        </View>
+        ))}
       </View>
 
       <View style={styles.section}>
@@ -376,6 +392,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  scrollViewContent: {
+    paddingBottom: 24,
   },
 });
 

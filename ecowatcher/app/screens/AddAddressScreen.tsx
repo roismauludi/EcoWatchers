@@ -7,12 +7,13 @@ import {
   ScrollView,
   Alert,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { doc, getDoc } from "firebase/firestore"; // Import Firestore methods
 import { db } from "../../firebaseConfig"; 
-import CONFIG from './../config';
+import CONFIG from '../config';
+import { Picker } from '@react-native-picker/picker';
 
 type RootStackParamList = {
   Penyetoran: undefined;
@@ -20,6 +21,8 @@ type RootStackParamList = {
 
 export default function AddAddressScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute();
+  const editAddress = (route.params as any)?.editAddress;
 
   // Variabel state untuk field form
   const [nama, setNama] = useState("");
@@ -29,11 +32,40 @@ export default function AddAddressScreen() {
   const [kecamatan, setKecamatan] = useState("");
   const [kodePos, setKodePos] = useState("");
   const [detailAlamat, setDetailAlamat] = useState("");
+  const [blokNo, setBlokNo] = useState("");
+  const [rtRw, setRtRw] = useState("");
 
-  // Ambil data pengguna
+  // Daftar kecamatan Batam
+  const kecamatanBatam = [
+    'Batam Kota',
+    'Lubuk Baja',
+    'Batu Ampar',
+    'Bengkong',
+    'Sei Beduk',
+    'Nongsa',
+    'Sekupang',
+    'Batu Aji',
+    'Sagulung',
+    'Belakang Padang',
+    'Bulang',
+    'Galang',
+  ];
+
+  // Ambil data pengguna & autofill jika edit
   useEffect(() => {
     fetchUserData();
-  }, []);
+    if (editAddress) {
+      setNama(editAddress.Nama || "");
+      setNoTlp(editAddress.No_tlp || "");
+      setLabelAlamat(editAddress.label_Alamat || "");
+      setKotaKabupaten(editAddress["kota-kabupaten"] || "");
+      setKecamatan(editAddress.Kecamatan || "");
+      setKodePos(editAddress.Kode_pos || "");
+      setDetailAlamat(editAddress.Detail_Alamat || "");
+      setBlokNo(editAddress.Blok_No || "");
+      setRtRw(editAddress.RT && editAddress.RW ? `${editAddress.RT}/${editAddress.RW}` : (editAddress.rtRw || ""));
+    }
+  }, [editAddress]);
 
   const fetchUserData = async () => {
     try {
@@ -43,23 +75,12 @@ export default function AddAddressScreen() {
         Alert.alert("Error", "ID pengguna tidak ditemukan");
         return;
       }
-
-      // Cek apakah nama pengguna sudah ada di AsyncStorage
-      const userNama = await AsyncStorage.getItem("userNama");
-      if (userNama) {
-        setNama(userNama); // Set nama jika ada
-        return;
-      }
-
-      // Jika nama pengguna belum ada di AsyncStorage, ambil dari Firestore
+      // Selalu ambil dari Firestore, jangan dari AsyncStorage
       const docRef = doc(db, "users", userId);
       const docSnap = await getDoc(docRef);
-
       if (docSnap.exists()) {
         const userData = docSnap.data();
         setNama(userData.nama); // Set nama pengguna dari Firestore
-        // Simpan nama pengguna ke AsyncStorage untuk penggunaan selanjutnya
-        await AsyncStorage.setItem("userNama", userData.nama);
       } else {
         Alert.alert("Error", "Data pengguna tidak ditemukan di Firestore");
       }
@@ -87,26 +108,38 @@ export default function AddAddressScreen() {
         kecamatan,
         kodePos,
         detailAlamat,
+        blokNo,
+        rtRw,
       };
 
-      // Menggunakan fetch untuk mengirim data alamat ke backend
-      const response = await fetch(`${CONFIG.API_URL}/api/add-address`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(addressData),
-      });
-
-      if (response.ok) {
-        // Navigasi ke halaman 'Penyetoran'
-        navigation.navigate("Penyetoran");
+      if (editAddress && editAddress.id) {
+        // MODE EDIT: update alamat
+        const response = await fetch(`${CONFIG.API_URL}/api/edit-address/${editAddress.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(addressData),
+        });
+        if (response.ok) {
+          navigation.goBack();
+        } else {
+          Alert.alert("Error", "Gagal mengupdate alamat");
+        }
       } else {
-        Alert.alert("Error", "Gagal menambahkan alamat");
+        // MODE TAMBAH: tambah alamat baru
+        const response = await fetch(`${CONFIG.API_URL}/api/add-address`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(addressData),
+        });
+        if (response.ok) {
+          navigation.goBack();
+        } else {
+          Alert.alert("Error", "Gagal menambahkan alamat");
+        }
       }
     } catch (error) {
-      console.error("Error adding address:", error);
-      Alert.alert("Error", "Gagal menambahkan alamat");
+      console.error("Error adding/updating address:", error);
+      Alert.alert("Error", "Gagal menyimpan alamat");
     }
   };
 
@@ -169,31 +202,42 @@ export default function AddAddressScreen() {
         <Text style={{ fontSize: 16, fontWeight: "bold", marginBottom: 8 }}>
           Kota / Kabupaten
         </Text>
-        <TextInput
-          value={kotaKabupaten}
-          onChangeText={setKotaKabupaten}
-          placeholder="Masukkan kota atau kabupaten!"
-          style={{
-            borderBottomWidth: 1,
-            borderBottomColor: "#D3D3D3",
-            marginBottom: 16,
-            paddingVertical: 4,
-          }}
-        />
+        <View style={{ borderWidth: 1, borderColor: "#D3D3D3", borderRadius: 4, marginBottom: 16 }}>
+          <Picker
+            selectedValue={kotaKabupaten}
+            onValueChange={setKotaKabupaten}
+          >
+            <Picker.Item label="Batam" value="Batam" />
+          </Picker>
+        </View>
         <Text style={{ fontSize: 16, fontWeight: "bold", marginBottom: 8 }}>
           Kecamatan
         </Text>
-        <TextInput
-          value={kecamatan}
-          onChangeText={setKecamatan}
-          placeholder="Masukkan kecamatan!"
-          style={{
-            borderBottomWidth: 1,
-            borderBottomColor: "#D3D3D3",
-            marginBottom: 16,
-            paddingVertical: 4,
-          }}
-        />
+        {kotaKabupaten.trim().toLowerCase() === 'batam' ? (
+          <View style={{ borderWidth: 1, borderColor: "#D3D3D3", borderRadius: 4, marginBottom: 16 }}>
+            <Picker
+              selectedValue={kecamatan}
+              onValueChange={setKecamatan}
+            >
+              <Picker.Item label="Pilih kecamatan" value="" />
+              {kecamatanBatam.map((kec) => (
+                <Picker.Item key={kec} label={kec} value={kec} />
+              ))}
+            </Picker>
+          </View>
+        ) : (
+          <TextInput
+            value={kecamatan}
+            onChangeText={setKecamatan}
+            placeholder="Masukkan kecamatan!"
+            style={{
+              borderBottomWidth: 1,
+              borderBottomColor: "#D3D3D3",
+              marginBottom: 16,
+              paddingVertical: 4,
+            }}
+          />
+        )}
         <Text style={{ fontSize: 16, fontWeight: "bold", marginBottom: 8 }}>
           Kode Pos
         </Text>
@@ -215,6 +259,34 @@ export default function AddAddressScreen() {
           value={detailAlamat}
           onChangeText={setDetailAlamat}
           placeholder="Masukkan detail alamat!"
+          style={{
+            borderBottomWidth: 1,
+            borderBottomColor: "#D3D3D3",
+            marginBottom: 16,
+            paddingVertical: 4,
+          }}
+        />
+        <Text style={{ fontSize: 16, fontWeight: "bold", marginBottom: 8 }}>
+          Blok / No. Rumah
+        </Text>
+        <TextInput
+          value={blokNo}
+          onChangeText={setBlokNo}
+          placeholder="Masukkan blok atau nomor rumah!"
+          style={{
+            borderBottomWidth: 1,
+            borderBottomColor: "#D3D3D3",
+            marginBottom: 16,
+            paddingVertical: 4,
+          }}
+        />
+        <Text style={{ fontSize: 16, fontWeight: "bold", marginBottom: 8 }}>
+          RT/RW
+        </Text>
+        <TextInput
+          value={rtRw}
+          onChangeText={setRtRw}
+          placeholder="Contoh: 02/05"
           style={{
             borderBottomWidth: 1,
             borderBottomColor: "#D3D3D3",

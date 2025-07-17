@@ -10,10 +10,13 @@ import {
   ActivityIndicator,
   TouchableOpacity,
 } from "react-native";
-import { useRouter } from "expo-router"; // Pastikan ini diimport
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from "../../utils/types";
 import CONFIG from "../config";
-import { NavigationProp, useNavigation } from "@react-navigation/native";
 import { Ionicons, AntDesign } from '@expo/vector-icons';
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const RegisterScreen = () => {
   const [email, setEmail] = useState("");
@@ -30,9 +33,7 @@ const RegisterScreen = () => {
     hasMinLength: false,
     hasUpperCase: false,
   });
-  const navigation = useNavigation();
-
-  const router = useRouter(); // Gunakan useRouter dari expo-router
+  const navigation = useNavigation<NavigationProp>();
 
   useEffect(() => {
     validatePasswordCriteria(password);
@@ -107,8 +108,7 @@ const RegisterScreen = () => {
           {
             text: "OK",
             onPress: () => {
-              console.log("Navigasi ke halaman login dipanggil");
-              navigation.navigate("Login" as never);
+              navigation.navigate("Login");
             },
           },
         ]);

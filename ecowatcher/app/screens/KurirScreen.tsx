@@ -4,13 +4,31 @@ import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from '../../utils/types';
 import { getAuth, signOut } from 'firebase/auth';
+import { SafeAreaView } from "react-native-safe-area-context";
+
+interface PenyetoranItem {
+  id: string;
+  queueNumber: string;
+  nama: string;
+  alamat: string;
+  status: string;
+  tanggal: string;
+}
+
+interface TrackData {
+  [queueNumber: string]: string;
+}
+
+type KurirScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, "KurirDashboard">;
 
 const KurirScreen = () => {
-  const [penyetoranData, setPenyetoranData] = useState([]);
-  const [trackData, setTrackData] = useState({});
+  const [penyetoranData, setPenyetoranData] = useState<PenyetoranItem[]>([]);
+  const [trackData, setTrackData] = useState<TrackData>({});
   const [loading, setLoading] = useState(true);
-  const navigation = useNavigation();
+  const navigation = useNavigation<KurirScreenNavigationProp>();
   const auth = getAuth(); // Firebase Authentication
 
   // Listener untuk koleksi 'Penyetoran' dengan urutan berdasarkan pickUpDate terbaru
@@ -57,7 +75,7 @@ const KurirScreen = () => {
   // Track data listener
   useEffect(() => {
     const unsubscribeTrack = onSnapshot(collection(db, 'Track'), (querySnapshot) => {
-      const track = {};
+      const track: TrackData = {};
       querySnapshot.docs.forEach((doc) => {
         const data = doc.data();
         const queueNumber = data.queueNumber;
@@ -84,12 +102,12 @@ const KurirScreen = () => {
       });
   };
 
-  const getStatusStyle = (status) => {
+  const getStatusStyle = (status: string) => {
     const baseStyle = {
       paddingHorizontal: 8,
       paddingVertical: 4,
       borderRadius: 12,
-      overflow: 'hidden',
+      // overflow: 'hidden', // Dihapus karena TypeScript tidak mengizinkan 'string' di sini, atau setel ke 'hidden' jika benar-benar diperlukan
     };
 
     switch (status.toLowerCase()) {
@@ -121,11 +139,12 @@ const KurirScreen = () => {
     </View>
   );
 
-  const renderItem = ({ item }) => (
+  const renderItem = ({ item }: { item: PenyetoranItem }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <View style={styles.cardHeaderLeft}>
           <Text style={styles.cardHeaderText}>{item.nama}</Text>
+          <Text style={styles.queueNumberText}>No. Antrian: {item.queueNumber}</Text>
           <Text style={styles.cardDate}>{item.tanggal}</Text>
         </View>
         <View style={styles.cardHeaderRight}>
@@ -163,7 +182,7 @@ const KurirScreen = () => {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {loading ? (
         <Text>Loading...</Text>
       ) : (
@@ -172,6 +191,7 @@ const KurirScreen = () => {
           renderItem={renderItem}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContainer}
+          style={{ flex: 1 }}
         />
       )}
 
@@ -179,7 +199,7 @@ const KurirScreen = () => {
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.logoutButtonText}>Logout</Text>
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -187,6 +207,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
+    paddingHorizontal: 16,
   },
   header: {
     padding: 16,
@@ -210,7 +231,8 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     gap: 12,
-    padding: 16,
+    paddingVertical: 16,
+    paddingBottom: 8,
   },
   card: {
     backgroundColor: '#fff',
@@ -278,16 +300,23 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   logoutButton: {
-    backgroundColor: '#ff1744',
-    paddingVertical: 12,
-    marginTop: 20,
-    marginHorizontal: 16,
+    backgroundColor: '#FF4C4C',
+    padding: 15,
     borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 0,
+    marginBottom: 0,
   },
   logoutButtonText: {
     color: '#fff',
     fontSize: 16,
     textAlign: 'center',
+  },
+  queueNumberText: {
+    fontSize: 13,
+    color: '#888',
+    fontWeight: '400',
   },
 });
 

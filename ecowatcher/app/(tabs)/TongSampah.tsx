@@ -8,16 +8,18 @@ import {
   FlatList,
   Modal,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Checkbox from "expo-checkbox";
-import { useSelectedItems } from "../(tabs)/context/SelectedItemsContext";
+import { useSelectedItems } from "../../context/SelectedItemsContext";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../types";
-import { CatalogItem } from "../CatalogItem";
+import { RootStackParamList } from "../../utils/types";
+import { CatalogItem } from "../../utils/CatalogItem";
 import { getAuth } from "firebase/auth";
-import CONFIG from "./../config";
+import CONFIG from "../config";
 
 const imageMapping: { [key: string]: any } = {
+  "default-sampah.png": require("../../assets/images/default-sampah.png"),
   "monitor-lcd.jpg": require("../../assets/images/elektronik/monitor-lcd.jpg"),
   "monitor-tabung.jpg": require("../../assets/images/elektronik/monitor-tabung.jpg"),
   "botol_kaca.png": require("../../assets/images/kaca/botol_kaca.png"),
@@ -48,9 +50,13 @@ export default function TongScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [markedItems, setMarkedItems] = useState<string[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
 
   const handleDelete = () => {
-    setSelectedItems([]);
+    setSelectedItems((prevItems) =>
+      prevItems.filter((item) => !markedItems.includes(item.id))
+    );
+    setMarkedItems([]);
   };
 
   const handleToggleItem = (item: CatalogItem) => {
@@ -118,75 +124,159 @@ export default function TongScreen() {
     }
   };
 
+  // Fungsi untuk toggle semua item
+  const handleSelectAll = () => {
+    if (selectedItems.length === 0) return;
+    if (selectAll) {
+      setMarkedItems([]);
+    } else {
+      setMarkedItems(selectedItems.map((item) => item.id));
+    }
+    setSelectAll(!selectAll);
+  };
+
+  // Update selectAll jika markedItems berubah
+  React.useEffect(() => {
+    setSelectAll(
+      selectedItems.length > 0 && markedItems.length === selectedItems.length
+    );
+  }, [markedItems, selectedItems]);
+
   const renderItem = ({ item }: { item: CatalogItem }) => {
+    // Tentukan satuan point
+    const isElektronik = (item.type || item.category || '').toLowerCase().includes('elektronik');
+    const pointUnit = isElektronik ? 'Poin / Unit' : 'Poin / Kg';
     return (
       <View style={styles.itemContainer}>
         <Checkbox
           value={markedItems.includes(item.id)}
           onValueChange={() => handleToggleItem(item)}
+          style={{ marginRight: 10 }}
         />
         <Image source={getImageSource(item.image)} style={styles.itemImage} />
         <View style={styles.itemDetails}>
-          <Text style={styles.itemTitle}>{item.name}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Text style={styles.itemTitle}>{item.name}</Text>
+            <Text
+              style={{
+                marginLeft: 8,
+                color: "#35C759",
+                fontWeight: "bold",
+                fontSize: 14,
+              }}
+            >
+              x{item.quantity || 1}
+            </Text>
+          </View>
           <Text style={styles.itemType}>{item.type || item.category}</Text>
-          <Text style={styles.itemPoints}>Points: {item.points}</Text>
-          <View style={styles.actionsContainer}>
+          <Text style={{ color: "#35C759", fontWeight: "bold", fontSize: 14 }}>
+            {item.points} {pointUnit}
+          </Text>
+          <View style={{ flexDirection: "row", marginTop: 10 }}>
             <TouchableOpacity
               onPress={() => handleShowDetails(item)}
               style={styles.detailButton}
             >
               <Text style={styles.detailButtonText}>Detail</Text>
             </TouchableOpacity>
-            <View style={styles.quantityContainer}>
-              <TouchableOpacity
-                style={styles.quantityButton}
-                onPress={() => handleQuantityChange(item.id, -1)}
-              >
-                <Text style={styles.quantityButtonText}>-</Text>
-              </TouchableOpacity>
-              <Text style={styles.quantityText}>{item.quantity || 1}</Text>
-              <TouchableOpacity
-                style={styles.quantityButton}
-                onPress={() => handleQuantityChange(item.id, 1)}
-              >
-                <Text style={styles.quantityButtonText}>+</Text>
-              </TouchableOpacity>
-            </View>
           </View>
+        </View>
+        {/* Quantity di pojok kanan bawah */}
+        <View style={styles.quantityFloatingContainer}>
+          <TouchableOpacity
+            style={[
+              styles.quantityButton,
+              (item.quantity || 1) <= 1 && styles.quantityButtonDisabled
+            ]}
+            onPress={() => handleQuantityChange(item.id, -1)}
+            disabled={(item.quantity || 1) <= 1}
+          >
+            <Text style={styles.quantityButtonText}>-</Text>
+          </TouchableOpacity>
+          <Text style={styles.quantityText}>{item.quantity || 1}</Text>
+          <TouchableOpacity
+            style={styles.quantityButton}
+            onPress={() => handleQuantityChange(item.id, 1)}
+          >
+            <Text style={styles.quantityButtonText}>+</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
   };
-  
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={styles.headerSolid}>
         <Text style={styles.title}>Tong Sampah</Text>
       </View>
 
       <View style={styles.actionRow}>
-        <TouchableOpacity onPress={handleDelete}>
-          <Text style={styles.deleteText}>Hapus Semua</Text>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Checkbox
+            value={selectAll}
+            onValueChange={handleSelectAll}
+            disabled={selectedItems.length === 0}
+            style={{ marginRight: 8 }}
+          />
+          <Text
+            style={{
+              color: selectedItems.length === 0 ? "#BDBDBD" : "#333",
+              fontSize: 14,
+            }}
+          >
+            Pilih Semua
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={handleDelete}
+          disabled={markedItems.length === 0}
+        >
+          <Text
+            style={{
+              color: markedItems.length === 0 ? "#BDBDBD" : "#E53935",
+              fontSize: 14,
+            }}
+          >
+            Hapus
+          </Text>
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={selectedItems}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        ListEmptyComponent={<Text>Tidak ada item di tong sampah.</Text>}
-      />
-      {selectedItems.length > 0 && (
+      {selectedItems.length > 0 ? (
+        <FlatList
+          data={selectedItems}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingBottom: 220 }} // padding bawah lebih besar agar item tidak terpotong
+          ListFooterComponent={<View style={{ height: 40 }} />}
+        />
+      ) : (
+        <Text style={styles.emptyCartText}>Tidak ada item di tong sampah.</Text>
+      )}
+
+      <SafeAreaView edges={['bottom']}>
         <View style={styles.footer}>
           <TouchableOpacity
-            style={styles.submitButton}
-            onPress={handleSubmit}
+            style={[
+              styles.submitButton,
+              {
+                backgroundColor: markedItems.length === 0 ? "#BDBDBD" : "#35C759",
+              },
+            ]}
+            onPress={() => {
+              const itemsToSubmit = selectedItems.filter((item) =>
+                markedItems.includes(item.id)
+              );
+              if (itemsToSubmit.length === 0) return;
+              navigation.navigate("Penyetoran", { items: itemsToSubmit });
+            }}
+            disabled={markedItems.length === 0}
           >
             <Text style={styles.submitButtonText}>Setorkan</Text>
           </TouchableOpacity>
         </View>
-      )}
+      </SafeAreaView>
 
       {selectedItem && (
         <Modal
@@ -219,16 +309,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F5F5F5",
     paddingHorizontal: 20,
+    paddingTop: 110, // agar konten tidak tertutup header
   },
   header: {
-    backgroundColor: "#35C759",
-    paddingVertical: 15,
+    // dihapus, diganti headerGradient
+  },
+  headerSolid: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 110,
+    zIndex: 1,
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#35C759",
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     color: "#FFFFFF",
     fontWeight: "bold",
+    textAlign: "center",
+    width: "100%",
+    flexShrink: 1,
   },
   actionRow: {
     flexDirection: "row",
@@ -279,9 +382,9 @@ const styles = StyleSheet.create({
   },
   itemPoints: {
     fontSize: 14,
-    color: "#FF5722",  // You can change the color as per your design preference
+    color: "#FF5722", // You can change the color as per your design preference
     fontWeight: "bold",
-  },  
+  },
   detailButton: {
     backgroundColor: "#35C759",
     borderRadius: 5,
@@ -308,31 +411,37 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#F9F9F9",
-    borderRadius: 5,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#DDD",
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    marginLeft: 10,
+    borderColor: "#E0E0E0",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginTop: 10,
+    alignSelf: "flex-start",
   },
   quantityButton: {
     backgroundColor: "#35C759",
-    borderRadius: 5,
-    padding: 8,
-    marginHorizontal: 5,
+    borderRadius: 20,
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 4,
+  },
+  quantityButtonDisabled: {
+    backgroundColor: "#BDBDBD",
   },
   quantityButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
+    color: "#fff",
+    fontSize: 20,
     fontWeight: "bold",
-    textAlign: "center",
   },
   quantityText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "bold",
     color: "#333",
     textAlign: "center",
-    minWidth: 30, // Untuk menjaga agar angka tetap rata
+    minWidth: 32,
   },
   submitButton: {
     backgroundColor: "#35C759",
@@ -380,5 +489,29 @@ const styles = StyleSheet.create({
     color: "#FFFFFF", // Warna teks putih
     fontWeight: "bold",
     textAlign: "center",
+  },
+  emptyCartText: {
+    textAlign: "center",
+    marginTop: 20,
+    fontSize: 16,
+    color: "gray",
+  },
+  quantityFloatingContainer: {
+    position: 'absolute',
+    right: 12,
+    bottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9F9F9',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
   },
 });
