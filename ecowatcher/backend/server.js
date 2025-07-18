@@ -12,11 +12,7 @@ const multer = require("multer"); // Untuk menangani unggahan file
 const moment = require('moment-timezone');
 const path = require("path");
 const fs = require("fs");
-const FormData = require('form-data');
-const IMAGEKIT_PRIVATE_KEY = 'private_wdSqGit9xbejUH48DiwTr4Jye24=';
-const IMAGEKIT_UPLOAD_URL = 'https://upload.imagekit.io/api/v1/files/upload';
-const IMAGEKIT_FOLDER = '/Penyetoran';
-const fetch = require('node-fetch');
+
 
 // Middleware
 const app = express();
