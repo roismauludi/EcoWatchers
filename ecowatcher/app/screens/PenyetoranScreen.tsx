@@ -25,6 +25,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from '@react-navigation/native';
 import * as Analytics from 'expo-firebase-analytics';
 
+
 type RootStackParamList = {
   PickUp: undefined;
   AddAddress: undefined;
@@ -236,6 +237,7 @@ export default function PenyetoranScreen() {
     console.log(formattedDate);
   };
 
+  // Ubah handlePickImage: hanya simpan URI lokal, tidak upload ke ImageKit
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status === 'granted') {
@@ -244,48 +246,39 @@ export default function PenyetoranScreen() {
         aspect: [4, 3],
         quality: 1,
       });
-
       if (!result.canceled) {
-        setPhotos(prevPhotos => [...prevPhotos, result.assets[0].uri]);
-        console.log("Image taken:", result.assets[0].uri);
+        const fileUri = result.assets[0].uri;
+        setPhotos(prevPhotos => [...prevPhotos, fileUri]);
+        console.log('Image picked:', fileUri);
       }
     } else {
       Alert.alert('Akses Ditolak', 'Untuk melanjutkan, Anda perlu memberikan izin untuk mengakses kamera.');
     }
   };
 
+  // Ubah handleSubmitWithPhotos: upload semua foto ke ImageKit saat submit
   const handleSubmitWithPhotos = async () => {
     // Validasi input
     if (!selectedAddress || items.length === 0 || photos.length === 0 || !selectedDate) {
       Alert.alert("Error", "Pastikan semua data sudah diisi.");
       return;
     }
-    
     // Persiapkan FormData
     const formData = new FormData();
     formData.append("userId", getAuth().currentUser?.uid || "");
     formData.append("address", JSON.stringify(selectedAddress));
     formData.append("items", JSON.stringify(items));
-    formData.append("pickUpDate", selectedDate); // Pastikan selectedDate sesuai dengan format yang benar
-    
-    // Loop through photos and append them one by one
+    formData.append("pickUpDate", selectedDate);
+    // Kirim file foto satu per satu
     photos.forEach((uri) => {
       const fileName = uri.split("/").pop();
-      const fileType = "image/jpeg"; // Sesuaikan dengan jenis file jika bukan JPEG
-      
-      // Append each photo as a separate part in FormData
       formData.append("photos", {
         uri,
         name: fileName,
-        type: fileType,
+        type: "image/jpeg",
       } as any);
     });
-  
-    // Log data before sending it to the server
-    console.log("Form Data:", formData);
-  
     try {
-      // Kirim permintaan ke server
       const response = await fetch(`${CONFIG.API_URL}/api/submit-pickup`, {
         method: "POST",
         headers: {
@@ -293,11 +286,8 @@ export default function PenyetoranScreen() {
         },
         body: formData,
       });
-  
       const result = await response.json();
-  
       if (response.ok) {
-        // Hapus item setelah penyetoran berhasil
         await handleDeleteItems(items);
         Alert.alert("Sukses", "Penyetoran berhasil dikonfirmasi!");
         navigation.navigate("PickUp");

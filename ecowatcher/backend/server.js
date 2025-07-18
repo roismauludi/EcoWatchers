@@ -4,13 +4,18 @@ const bodyParser = require('body-parser');
 const { body, validationResult } = require('express-validator');
 const { initializeApp } = require('firebase/app'); // Import modular Firebase
 const { getAuth, createUserWithEmailAndPassword } = require('firebase/auth'); // Import metode auth
-const { getFirestore, doc, setDoc, collection, getDocs, query, where, addDoc, deleteDoc, updateDoc, increment, getDoc } = require('firebase/firestore');
+const { getFirestore, doc, setDoc, collection, getDocs, query, where, addDoc, deleteDoc, updateDoc, increment, getDoc, orderBy, limit } = require('firebase/firestore');
 const { arrayUnion } = require('firebase/firestore');
 const { v4: uuidv4 } = require('uuid'); // Import UUID
 const multer = require("multer"); // Untuk menangani unggahan file
 const moment = require('moment-timezone');
 const path = require("path");
 const fs = require("fs");
+const FormData = require('form-data');
+const IMAGEKIT_PRIVATE_KEY = 'private_wdSqGit9xbejUH48DiwTr4Jye24=';
+const IMAGEKIT_UPLOAD_URL = 'https://upload.imagekit.io/api/v1/files/upload';
+const IMAGEKIT_FOLDER = '/Penyetoran';
+const fetch = require('node-fetch');
 
 // Middleware
 const app = express();
@@ -111,7 +116,8 @@ app.get('/api/catalog', async (req, res) => {
     console.log('Received GET request at /api/catalog');
 
     try {
-        const catalogRef = collection(db, 'katalog');
+        // OPTIMIZED: tambahkan limit 100
+        const catalogRef = query(collection(db, 'katalog'), limit(100));
         const snapshot = await getDocs(catalogRef);
 
         console.log('Catalog snapshot size:', snapshot.size);
@@ -242,10 +248,18 @@ app.delete('/api/delete-item/:itemId', async (req, res) => {
             await deleteDoc(docRef);
         }
 
-        // Ambil kembali daftar item setelah penghapusan
-        const remainingItemsSnapshot = await getDocs(collection(db, 'tong'));
-        const remainingItems = remainingItemsSnapshot.docs.map(doc => doc.data());
-
+        // OPTIMIZED: Ambil item hanya milik user tertentu jika memungkinkan (misal: userId dikirim di req.query)
+        let remainingItems = [];
+        if (req.query.userId) {
+            const q = query(collection(db, 'tong'), where('userId', '==', req.query.userId));
+            const remainingItemsSnapshot = await getDocs(q);
+            remainingItems = remainingItemsSnapshot.docs.map(doc => doc.data());
+        } else {
+            // fallback: ambil max 20 item
+            const q = query(collection(db, 'tong'), limit(20));
+            const remainingItemsSnapshot = await getDocs(q);
+            remainingItems = remainingItemsSnapshot.docs.map(doc => doc.data());
+        }
         res.status(200).json({ message: 'Item deleted successfully', items: remainingItems });
     } catch (error) {
         console.error('Error deleting item:', error);
@@ -295,23 +309,12 @@ app.post('/api/add-address', async (req, res) => {
 app.get('/api/get-addresses/:userId', async (req, res) => {
     const { userId } = req.params;
     console.log('Received GET request for userId:', userId);
-
     try {
-        const querySnapshot = await getDocs(collection(db, "Alamat"));
-        const addresses = [];
-        
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            if (data.userId === userId) {
-                addresses.push({ id: doc.id, ...data });
-            }
-        });
-
-        if (addresses.length > 0) {
-            return res.status(200).json(addresses);
-        } else {
-            return res.status(200).json([]); // Selalu kirim array kosong jika tidak ada alamat
-        }
+        // OPTIMIZED: gunakan query where userId
+        const q = query(collection(db, "Alamat"), where("userId", "==", userId));
+        const querySnapshot = await getDocs(q);
+        const addresses = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        return res.status(200).json(addresses);
     } catch (error) {
         console.error('Error fetching addresses:', error);
         return res.status(500).send('Error fetching addresses');
@@ -403,7 +406,6 @@ app.post('/api/submit-pickup', upload.array('photos'), async (req, res) => {
         const formattedPickUpDate = moment(pickUpDate, 'dddd, DD MMMM YYYY', 'id', true);
         console.log('Tanggal setelah format:', formattedPickUpDate.format());
 
-
         if (!formattedPickUpDate.isValid()) {
             return res.status(400).json({ message: 'Tanggal pickup tidak valid. Format yang benar adalah Hari-Bulan-Tahun (Contoh: Kamis, 13 Desember 2024).' });
         }
@@ -416,21 +418,15 @@ app.post('/api/submit-pickup', upload.array('photos'), async (req, res) => {
             return path.join('uploads/photos', file.filename); // Atau Anda dapat menyimpan URL yang dapat diakses secara publik
         });
 
-        // Ambil antrean terakhir
-        const snapshot = await getDocs(collection(db, "Penyetoran"));
+        // Perbaiki ambil antrian terakhir (queue number) agar tidak boros read
+        const q = query(collection(db, "Penyetoran"), orderBy("queueNumber", "desc"), limit(1));
+        const snapshot = await getDocs(q);
         let lastQueueNumber = 0;
-
         if (!snapshot.empty) {
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                if (data.queueNumber) {
-                    // Ambil nomor antrean terbesar
-                    const currentNumber = parseInt(data.queueNumber.split('-')[1], 10);
-                    if (currentNumber > lastQueueNumber) {
-                        lastQueueNumber = currentNumber;
-                    }
-                }
-            });
+          const data = snapshot.docs[0].data();
+          if (data.queueNumber) {
+            lastQueueNumber = parseInt(data.queueNumber.split('-')[1], 10);
+          }
         }
 
         // Generate nomor antrean baru
@@ -446,7 +442,7 @@ app.post('/api/submit-pickup', upload.array('photos'), async (req, res) => {
             queueNumber: newQueueNumber, // Nomor antrean baru
             address: parsedAddress, // Pastikan alamat sudah berupa objek
             items: parsedItems,
-            photos: photoUrls,
+            photos: photoUrls, // Simpan array path file
             pickUpDate: isoFormattedPickUpDate, // Gunakan formattedPickUpDate dalam ISO
             pickUpFee: pickUpFee, // Gunakan biaya hasil fungsi
             status: "Pending",
@@ -455,9 +451,6 @@ app.post('/api/submit-pickup', upload.array('photos'), async (req, res) => {
 
         // Simpan `pickupData` ke Firestore
         await addDoc(collection(db, "Penyetoran"), pickupData);
-
-        // Menampilkan informasi foto yang diupload
-        console.log("Uploaded files:", req.files);
 
         // Kirim respon sukses
         res.status(200).json({ message: "Data berhasil diterima", queueNumber: newQueueNumber, photos: req.files });
@@ -920,10 +913,14 @@ app.post('/api/cancel-pickup/:id', async (req, res) => {
 // Ambil semua campaign
 app.get('/api/campaigns', async (req, res) => {
   try {
-    const campaignsRef = collection(db, 'campaigns');
+    // OPTIMIZED: tampilkan campaign status ongoing dan ended, limit 100
+    const campaignsRef = query(
+      collection(db, 'campaigns'),
+      where('status', 'in', ['ongoing', 'ended']),
+      limit(100)
+    );
     const snapshot = await getDocs(campaignsRef);
     const now = new Date();
-
     const campaigns = await Promise.all(snapshot.docs.map(async doc => {
       const data = doc.data();
       let campaignDate = null;
@@ -972,7 +969,6 @@ app.get('/api/campaigns', async (req, res) => {
       }
       return { id: doc.id, ...data };
     }));
-
     res.status(200).json(campaigns);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching campaigns' });
@@ -1019,7 +1015,8 @@ app.post('/api/campaigns', upload.single('image'), async (req, res) => {
 // Scheduled job untuk update status campaign setiap 1 menit
 setInterval(async () => {
   try {
-    const campaignsRef = collection(db, 'campaigns');
+    // OPTIMIZED: filter status ongoing dan limit 100
+    const campaignsRef = query(collection(db, 'campaigns'), where('status', '==', 'ongoing'), limit(100));
     const snapshot = await getDocs(campaignsRef);
     const now = new Date();
     const monthMap = {
