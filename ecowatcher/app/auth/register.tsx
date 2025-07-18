@@ -15,7 +15,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../utils/types";
 import CONFIG from "../config";
 import { Ionicons, AntDesign } from '@expo/vector-icons';
-
+import * as Analytics from 'expo-firebase-analytics'; 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const RegisterScreen = () => {
@@ -112,6 +112,7 @@ const RegisterScreen = () => {
             },
           },
         ]);
+        Analytics.logEvent('register', { method: 'email' });
       } else {
         const errorMessage = await response.text();
         Alert.alert("Gagal mendaftarkan pengguna", errorMessage || "Terjadi kesalahan.");

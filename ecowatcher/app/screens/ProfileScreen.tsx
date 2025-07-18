@@ -8,6 +8,7 @@ import { db } from '../../firebaseConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as Analytics from 'expo-firebase-analytics';
 
 // Definisikan tipe untuk routes
 type RootStackParamList = {
@@ -47,7 +48,7 @@ const ProfileScreen = () => {
   });
 
   useEffect(() => {
-    fetchUserData();
+    Analytics.logEvent('screen_view', { screen_name: 'Profile' });
   }, []);
 
   useFocusEffect(

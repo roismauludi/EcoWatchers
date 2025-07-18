@@ -5,6 +5,8 @@ import CONFIG from '../config';
 import moment from 'moment';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../utils/types';
+import * as Analytics from 'expo-firebase-analytics';
+import { useEffect } from 'react';
 
 type PickupDetails = {
   queueNumber: string;
@@ -19,6 +21,10 @@ export default function TrackScreen() {
   const [loading, setLoading] = React.useState(true);
   const [pickupDetails, setPickupDetails] = React.useState<PickupDetails | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+
+  useEffect(() => {
+    Analytics.logEvent('screen_view', { screen_name: 'Track' });
+  }, []);
 
   React.useEffect(() => {
     const fetchPickupDetails = async () => {

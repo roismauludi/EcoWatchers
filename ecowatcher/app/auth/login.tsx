@@ -18,6 +18,7 @@ import { db } from "../../firebaseConfig"; // Firestore instance Anda
 import { RootStackParamList } from '../../utils/types';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context'; // Import SafeAreaView
+import * as Analytics from 'expo-firebase-analytics';
 
 // Tipe navigasi
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -82,6 +83,9 @@ const LoginScreen = () => {
         
         // Simpan level pengguna ke AsyncStorage
         await AsyncStorage.setItem("userLevel", userLevel);
+
+        // Tracking analytics login
+        Analytics.logEvent('login', { method: 'email' });
 
         // Navigasi berdasarkan level pengguna
         if (userLevel === "admin") {

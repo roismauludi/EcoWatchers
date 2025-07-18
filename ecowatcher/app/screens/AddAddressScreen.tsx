@@ -14,6 +14,7 @@ import { doc, getDoc } from "firebase/firestore"; // Import Firestore methods
 import { db } from "../../firebaseConfig"; 
 import CONFIG from '../config';
 import { Picker } from '@react-native-picker/picker';
+import * as Analytics from 'expo-firebase-analytics';
 
 type RootStackParamList = {
   Penyetoran: undefined;
@@ -66,6 +67,10 @@ export default function AddAddressScreen() {
       setRtRw(editAddress.RT && editAddress.RW ? `${editAddress.RT}/${editAddress.RW}` : (editAddress.rtRw || ""));
     }
   }, [editAddress]);
+
+  useEffect(() => {
+    Analytics.logEvent('screen_view', { screen_name: 'AddAddress' });
+  }, []);
 
   const fetchUserData = async () => {
     try {

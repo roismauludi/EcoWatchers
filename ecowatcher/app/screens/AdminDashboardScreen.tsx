@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -58,6 +58,12 @@ const AdminDashboardScreen = () => {
   const [feeKecamatanEdit, setFeeKecamatanEdit] = useState<any>({});
   const [newKecamatan, setNewKecamatan] = useState('');
   const [newFee, setNewFee] = useState('');
+  const [mapRegion, setMapRegion] = useState<any>(null);
+  // HAPUS: const [searchQuery, setSearchQuery] = useState('');
+  // HAPUS: const [searchResults, setSearchResults] = useState([]);
+  // HAPUS: const searchTimeout = useRef<number | null>(null);
+
+  // HAPUS: handleSearchChange, handleSelectResult
 
   useEffect(() => {
     const q = query(collection(CONFIG.FIRESTORE_DB, 'campaigns'));
@@ -201,6 +207,13 @@ const AdminDashboardScreen = () => {
         latitude: loc.coords.latitude,
         longitude: loc.coords.longitude,
       });
+      setForm({ ...form, latitude: null, longitude: null });
+      setMapRegion({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+        latitudeDelta: 0.0015,
+        longitudeDelta: 0.0015,
+      });
       setShowMap(true);
     } else {
       Alert.alert('Izin lokasi diperlukan untuk memilih lokasi di map');
@@ -230,6 +243,17 @@ const AdminDashboardScreen = () => {
       }
     } catch (err) {}
     setForm({ ...form, latitude, longitude, location: address || `${latitude},${longitude}` });
+  };
+
+  const handlePoiClick = (e: any) => {
+    const { coordinate, name } = e.nativeEvent;
+    setForm({
+      ...form,
+      latitude: coordinate.latitude,
+      longitude: coordinate.longitude,
+      location: name || `${coordinate.latitude},${coordinate.longitude}`,
+    });
+    setShowMap(false);
   };
 
   const handleAddCampaign = async () => {
@@ -466,25 +490,34 @@ const AdminDashboardScreen = () => {
                         <Text>Memuat lokasi Anda...</Text>
                       </View>
                     ) : (
-                      <MapView
-                        style={{ flex: 1 }}
-                        initialRegion={{
-                          latitude: form.latitude || userLocation.latitude,
-                          longitude: form.longitude || userLocation.longitude,
-                          latitudeDelta: 0.01,
-                          longitudeDelta: 0.01,
-                        }}
-                        onPress={handleMapPress}
-                        mapType="hybrid"
-                      >
-                        {form.latitude && form.longitude && (
-                          <Marker
-                            coordinate={{ latitude: form.latitude, longitude: form.longitude }}
-                            draggable
-                            onDragEnd={handleMarkerDragEnd}
-                          />
-                        )}
-                      </MapView>
+                      <View style={{ flex: 1 }}>
+                        {/* HAPUS: Search Bar */}
+                        <MapView
+                          style={{ flex: 1 }}
+                          region={form.latitude && form.longitude ? {
+                            latitude: form.latitude,
+                            longitude: form.longitude,
+                            latitudeDelta: 0.0015,
+                            longitudeDelta: 0.0015,
+                          } : mapRegion}
+                          onPress={handleMapPress}
+                          onPoiClick={handlePoiClick}
+                          mapType="hybrid"
+                        >
+                          {form.latitude && form.longitude ? (
+                            <Marker
+                              coordinate={{ latitude: form.latitude, longitude: form.longitude }}
+                              draggable
+                              onDragEnd={handleMarkerDragEnd}
+                            />
+                          ) : (
+                            <Marker
+                              coordinate={{ latitude: userLocation.latitude, longitude: userLocation.longitude }}
+                              pinColor="#22B07D"
+                            />
+                          )}
+                        </MapView>
+                      </View>
                     )}
                     <TouchableOpacity style={{ padding: 16, backgroundColor: '#22B07D' }} onPress={() => setShowMap(false)}>
                       <Text style={{ color: '#fff', textAlign: 'center' }}>Tutup</Text>
@@ -511,8 +544,16 @@ const AdminDashboardScreen = () => {
               {form.image && (
                 <Image source={form.image} style={{ width: 100, height: 100, alignSelf: 'center', marginVertical: 8 }} />
               )}
-              <TouchableOpacity style={styles.saveButton} onPress={handleAddCampaign}>
-                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Simpan</Text>
+              <TouchableOpacity 
+                style={[styles.saveButton, loading && { opacity: 0.7 }]}
+                onPress={handleAddCampaign}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Simpan</Text>
+                )}
               </TouchableOpacity>
               <TouchableOpacity style={styles.cancelButton} onPress={() => setModalVisible(false)}>
                 <Text style={{ color: '#22B07D' }}>Batal</Text>

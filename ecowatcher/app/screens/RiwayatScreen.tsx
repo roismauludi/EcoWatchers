@@ -5,6 +5,7 @@ import CONFIG from '../config';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import moment from 'moment';
+import * as Analytics from 'expo-firebase-analytics';
 
 type Item = {
     description: string;
@@ -127,6 +128,10 @@ const RiwayatScreen: React.FC = () => {
             fetchData();
         }, [userId])
     );
+
+    useEffect(() => {
+        Analytics.logEvent('screen_view', { screen_name: 'Riwayat' });
+    }, []);
 
     const formatDate = (dateString: string) => {
         const options: Intl.DateTimeFormatOptions = {

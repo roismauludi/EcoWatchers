@@ -13,12 +13,18 @@ import { useNavigation } from "@react-navigation/native";
 import CONFIG from '../config';
 import { RootStackParamList } from '../../utils/types';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as Analytics from 'expo-firebase-analytics';
+import { useEffect } from 'react';
 
 const CampaignListScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [activeTab, setActiveTab] = useState<'ongoing' | 'ended'>('ongoing');
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Analytics.logEvent('screen_view', { screen_name: 'AllCampaign' });
+  }, []);
 
   React.useEffect(() => {
     const fetchCampaigns = async () => {

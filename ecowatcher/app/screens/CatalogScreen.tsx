@@ -19,6 +19,7 @@ import { RootStackParamList } from "../../utils/types";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { CatalogItem } from "../../utils/CatalogItem";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Analytics from 'expo-firebase-analytics';
 
 const imageAssets: { [key: string]: any } = {
   "default-sampah.png": require("../../assets/images/default-sampah.png"),
@@ -53,6 +54,10 @@ const CatalogScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute();
   const onSelectItem = (route.params as any)?.onSelectItem;
+
+  useEffect(() => {
+    Analytics.logEvent('screen_view', { screen_name: 'Catalog' });
+  }, []);
 
   useEffect(() => {
     const fetchCatalogData = async () => {

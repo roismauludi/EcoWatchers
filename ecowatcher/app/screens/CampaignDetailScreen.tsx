@@ -13,14 +13,23 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons, FontAwesome5, Entypo } from "@expo/vector-icons";
 import CONFIG from '../config';
+import * as Analytics from 'expo-firebase-analytics';
+import { useEffect } from 'react';
 
 const CampaignDetailScreen = ({ route }: any) => {
   const navigation = useNavigation();
   const { campaign } = route.params;
 
+  useEffect(() => {
+    Analytics.logEvent('screen_view', { screen_name: 'CampaignDetail' });
+  }, []);
+
   const handleOpenLink = async (url: string) => {
     const supported = await Linking.canOpenURL(url);
     if (supported) {
+      if (url.includes('whatsapp.com')) {
+        Analytics.logEvent('join_whatsapp', { campaign: campaign.title });
+      }
       Linking.openURL(url);
     } else {
       Alert.alert("Gagal membuka link", "URL tidak didukung.");
@@ -40,7 +49,13 @@ const CampaignDetailScreen = ({ route }: any) => {
   };
 
   const openInGoogleMaps = () => {
-    if (campaign.latitude && campaign.longitude) {
+    if (campaign.location) {
+      // encode nama lokasi agar URL valid
+      const locationQuery = encodeURIComponent(campaign.location);
+      const url = `https://www.google.com/maps/search/?api=1&query=${locationQuery}`;
+      Linking.openURL(url);
+    } else if (campaign.latitude && campaign.longitude) {
+      // fallback ke koordinat jika nama lokasi tidak ada
       const url = `https://www.google.com/maps/search/?api=1&query=${campaign.latitude},${campaign.longitude}`;
       Linking.openURL(url);
     } else {

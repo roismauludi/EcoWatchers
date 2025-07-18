@@ -16,10 +16,12 @@
       "supportsTablet": true
     },
     "android": {
+       "googleServicesFile": "./android/app/google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.anonymous.ecowatcher"
     },
     "web": {
       "bundler": "metro",

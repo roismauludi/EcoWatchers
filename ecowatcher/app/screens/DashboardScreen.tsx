@@ -3,12 +3,18 @@ import { ScrollView, StyleSheet, TouchableOpacity, Text, View } from 'react-nati
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // Add this
 import { RootStackParamList } from '../../utils/types'; // Import type RootStackParamList if applicable
+import * as Analytics from 'expo-firebase-analytics';
+import { useEffect } from 'react';
 
 // Define navigation type
 type DashboardScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const DashboardScreen = () => {
   const navigation = useNavigation<DashboardScreenNavigationProp>(); // Use correct navigation type
+
+  useEffect(() => {
+    Analytics.logEvent('screen_view', { screen_name: 'Dashboard' });
+  }, []);
 
   return (
     <ScrollView style={styles.container}>

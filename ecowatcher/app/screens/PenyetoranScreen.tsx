@@ -23,6 +23,7 @@ import CONFIG from '../config';
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from '@react-navigation/native';
+import * as Analytics from 'expo-firebase-analytics';
 
 type RootStackParamList = {
   PickUp: undefined;
@@ -131,6 +132,10 @@ export default function PenyetoranScreen() {
       setFeeKecamatanLoading(false);
     };
     fetchFeeKecamatan();
+  }, []);
+
+  useEffect(() => {
+    Analytics.logEvent('screen_view', { screen_name: 'Penyetoran' });
   }, []);
 
 

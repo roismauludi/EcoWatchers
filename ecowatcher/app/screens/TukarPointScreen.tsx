@@ -25,6 +25,7 @@ import {
 import { db } from "../../firebaseConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Modal from "react-native-modal";
+import * as Analytics from 'expo-firebase-analytics';
 
 const { width } = Dimensions.get("window");
 
@@ -45,6 +46,10 @@ const TukarPointScreen = () => {
     { id: "3", nominal: 50000, pointRequired: 50100 },
     { id: "4", nominal: 100000, pointRequired: 101000 },
   ];
+
+  useEffect(() => {
+    Analytics.logEvent('screen_view', { screen_name: 'TukarPoint' });
+  }, []);
 
   useEffect(() => {
     const fetchPoinData = async () => {

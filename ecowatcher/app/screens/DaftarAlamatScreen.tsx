@@ -7,6 +7,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { collection, query, where, onSnapshot, doc, deleteDoc } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 import CONFIG from "../config";
+import * as Analytics from 'expo-firebase-analytics';
 
 export default function DaftarAlamatScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -15,6 +16,10 @@ export default function DaftarAlamatScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalAddress, setModalAddress] = useState<any>(null);
+
+  useEffect(() => {
+    Analytics.logEvent('screen_view', { screen_name: 'DaftarAlamat' });
+  }, []);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;

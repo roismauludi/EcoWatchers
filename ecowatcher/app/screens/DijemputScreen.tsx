@@ -134,11 +134,11 @@ export default function DiJemputScreen() {
           <TouchableOpacity
             style={styles.detailButton}
             onPress={() => {
-              const itemId = item.items[0]?.itemId;
-              if (itemId) {
-                navigation.navigate('Rincian', { id: itemId, pickupId: item.id });
+              const id = item.items[0]?.id;
+              if (id) {
+                navigation.navigate('Rincian', { id: id, pickupId: item.id });
               } else {
-                console.log('ItemId tidak ditemukan');
+                console.log('id tidak ditemukan');
               }
             }}
           >
