@@ -7,7 +7,6 @@ const { initializeApp } = require('firebase/app'); // Import modular Firebase
 const { getAuth, createUserWithEmailAndPassword } = require('firebase/auth'); // Import metode auth
 const { getFirestore, doc, setDoc, collection, getDocs, query, where, addDoc, deleteDoc, updateDoc, increment, getDoc, orderBy, limit } = require('firebase/firestore');
 const { arrayUnion } = require('firebase/firestore');
-const { v4: uuidv4 } = require('uuid'); // Import UUID
 const multer = require("multer"); // Untuk menangani unggahan file
 const moment = require('moment-timezone');
 const path = require("path");
