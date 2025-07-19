@@ -3,8 +3,8 @@ import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient"; // Pastikan Anda mengimpor LinearGradient
-import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -69,6 +69,7 @@ const ProfileScreen = () => {
       }
 
       const usersRef = collection(db, 'users');
+      console.log('DEBUG DB ProfileScreen:', db);
       const q = query(usersRef, where('email', '==', userEmail));
       const querySnapshot = await getDocs(q);
 

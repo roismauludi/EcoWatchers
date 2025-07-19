@@ -1015,7 +1015,7 @@ setInterval(async () => {
     // OPTIMIZED: filter status ongoing dan limit 100
     const campaignsRef = query(collection(db, 'campaigns'), where('status', '==', 'ongoing'), limit(100));
     const snapshot = await getDocs(campaignsRef);
-    const now = new Date();
+    const now = moment().tz('Asia/Jakarta');
     const monthMap = {
       'Januari': 0, 'Februari': 1, 'Maret': 2, 'April': 3, 'Mei': 4, 'Juni': 5,
       'Juli': 6, 'Agustus': 7, 'September': 8, 'Oktober': 9, 'November': 10, 'Desember': 11
@@ -1025,42 +1025,41 @@ setInterval(async () => {
       let campaignDate = null;
       let isEnded = false;
       try {
+        // Parsing tanggal
         const [day, month, year] = data.date.split(' ');
-        campaignDate = new Date(Number(year), monthMap[month], Number(day));
-        if (
-          campaignDate.getFullYear() === now.getFullYear() &&
-          campaignDate.getMonth() === now.getMonth() &&
-          campaignDate.getDate() === now.getDate() &&
-          data.time
-        ) {
-          let timeStr = data.time.replace('–', '-').replace('—', '-').replace('–', '-');
+        campaignDate = moment.tz(`${year}-${monthMap[month]+1}-${day}`, 'YYYY-M-D', 'Asia/Jakarta');
+        // Parsing jam selesai
+        if (campaignDate.isValid() && campaignDate.isSame(now, 'day') && data.time) {
+          let timeStr = data.time.replace(/[–—]/g, '-').replace(/WIB|WITA|WIT/gi, '').trim();
           let timeRange = timeStr.split('-');
           if (timeRange.length === 2) {
-            let endTime = timeRange[1].replace('WIB', '').trim();
+            let endTime = timeRange[1].trim();
             let hour = 0, minute = 0;
             if (endTime.includes(':')) {
               [hour, minute] = endTime.split(':').map(Number);
             } else if (endTime.includes('.')) {
               [hour, minute] = endTime.split('.').map(Number);
             }
-            const campaignEnd = new Date(now);
-            campaignEnd.setHours(hour, minute, 0, 0);
-            if (now > campaignEnd) {
+            const campaignEnd = campaignDate.clone().hour(hour).minute(minute).second(0);
+            console.log(`[Campaign Scheduler] now: ${now.format()} | campaignEnd: ${campaignEnd.format()} | title: ${data.title}`);
+            if (now.isAfter(campaignEnd)) {
               isEnded = true;
             }
           }
-        } else if (campaignDate < now) {
+        } else if (campaignDate.isValid() && campaignDate.isBefore(now, 'day')) {
           isEnded = true;
         }
       } catch (e) {
-        if (campaignDate && campaignDate < now) isEnded = true;
+        console.error('[Campaign Scheduler] Error parsing date/time:', e, data);
+        if (campaignDate && campaignDate.isBefore(now, 'day')) isEnded = true;
       }
       if (data.status === 'ongoing' && isEnded) {
         await updateDoc(docSnap.ref, { status: 'ended' });
+        console.log(`[Campaign Scheduler] Status campaign '${data.title}' diubah menjadi 'ended'`);
       }
     }
   } catch (e) {
-    console.error('Scheduled campaign status update error:', e);
+    console.error('[Campaign Scheduler] Scheduled campaign status update error:', e);
   }
 }, 60000);
 

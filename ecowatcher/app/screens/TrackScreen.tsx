@@ -7,6 +7,8 @@ import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../utils/types';
 import * as Analytics from 'expo-firebase-analytics';
 import { useEffect } from 'react';
+import { onSnapshot, collection, query, where, doc, getDocs } from 'firebase/firestore';
+import { db } from '../../firebaseConfig';
 
 type PickupDetails = {
   queueNumber: string;
@@ -27,41 +29,55 @@ export default function TrackScreen() {
   }, []);
 
   React.useEffect(() => {
-    const fetchPickupDetails = async () => {
-      try {
-        const response = await fetch(`${CONFIG.API_URL}/api/track-pickup/${pickupId}`);
-        if (!response.ok) {
-          throw new Error('Data tidak ditemukan');
-        }
-        const data = await response.json();
-        
-        // Convert timestamps
-        if (data.timestamp) {
-          data.timestamp = moment(data.timestamp).toDate();
-        }
-        
-        // Convert and sort statuses by timestamp in descending order (newest first)
-        if (data.statuses) {
-          data.statuses = data.statuses
-            .map((status: any) => ({
-              ...status,
-              timestamp: moment(status.timestamp).toDate()
-            }))
-            .sort((a: any, b: any) => 
-              moment(b.timestamp).valueOf() - moment(a.timestamp).valueOf()
-            );
-        }
-        
-        setPickupDetails(data);
-      } catch (error: any) {
-        console.error(error);
-        setError(error.message || 'Terjadi kesalahan dalam mengambil data.');
-      } finally {
+    let unsub: (() => void) | undefined;
+    setLoading(true);
+    setError(null);
+    // Cari dokumen Track yang sesuai pickupId
+    const q = query(collection(db, 'Track'), where('pickupId', '==', pickupId));
+    getDocs(q).then(snapshot => {
+      if (!snapshot.empty) {
+        const trackDoc = snapshot.docs[0];
+        unsub = onSnapshot(doc(db, 'Track', trackDoc.id), (docSnap) => {
+          if (docSnap.exists()) {
+            let data = docSnap.data();
+            // Convert timestamps
+            if (data.timestamp && typeof data.timestamp.toDate === 'function') {
+              data.timestamp = data.timestamp.toDate();
+            }
+            // Convert and sort statuses by timestamp in descending order (newest first)
+            if (data.statuses) {
+              data.statuses = data.statuses
+                .map((status: any) => ({
+                  ...status,
+                  timestamp: status.timestamp && typeof status.timestamp.toDate === 'function'
+                    ? status.timestamp.toDate()
+                    : new Date(status.timestamp)
+                }))
+                .sort((a: any, b: any) => 
+                  moment(b.timestamp).valueOf() - moment(a.timestamp).valueOf()
+                );
+            }
+            setPickupDetails(data);
+            setError(null);
+          } else {
+            setError('Data tidak ditemukan');
+            setPickupDetails(null);
+          }
+          setLoading(false);
+        });
+      } else {
+        setError('Data tidak ditemukan');
+        setPickupDetails(null);
         setLoading(false);
       }
+    }).catch((error) => {
+      setError('Terjadi kesalahan dalam mengambil data.');
+      setPickupDetails(null);
+      setLoading(false);
+    });
+    return () => {
+      if (unsub) unsub();
     };
-
-    fetchPickupDetails();
   }, [pickupId]);
 
   if (loading) {

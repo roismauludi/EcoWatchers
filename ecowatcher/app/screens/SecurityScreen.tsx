@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
-import { getAuth, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
+import { auth } from '../../firebaseConfig';
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { Ionicons, AntDesign } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
@@ -58,7 +59,6 @@ const SecurityScreen = () => {
 
     setLoading(true);
     try {
-      const auth = getAuth();
       const user = auth.currentUser;
       if (!user || !user.email) throw new Error('User tidak ditemukan');
       const credential = EmailAuthProvider.credential(user.email, oldPassword);

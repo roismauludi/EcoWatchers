@@ -5,23 +5,23 @@ EcoWatcher adalah aplikasi untuk monitoring lingkungan yang terdiri dari aplikas
 ## 🚀 Instalasi
 
 ### 1. Clone Repository
-bash
+```bash
 git clone <repository-url>
 cd ecowatcher
-
+```
 
 ### 2. Konfigurasi IP Address
 
 Sebelum menjalankan aplikasi, Anda perlu mengonfigurasi IP Address:
 
 1. Dapatkan IP Address lokal Anda:
-   bash
+   ```bash
    # Pada Windows (CMD/PowerShell)
    ipconfig
    
    # Pada macOS/Linux
    ifconfig
-   
+   ```
 
 2. Salin IPv4 Address yang ditampilkan
 
@@ -33,7 +33,7 @@ Sebelum menjalankan aplikasi, Anda perlu mengonfigurasi IP Address:
 
 Install dependencies untuk semua komponen aplikasi:
 
-bash
+```bash
 # Install dependencies untuk EcoWatcher (Mobile App)
 cd ecowatcher
 npm install
@@ -41,34 +41,34 @@ npm install
 # Install dependencies untuk Admin Dashboard
 cd ../EcoWatcher-Web
 npm install
+```
 
-
-## 🏃‍♂ Menjalankan Aplikasi
+## 🏃‍♂️ Menjalankan Aplikasi
 
 ### Mobile App (EcoWatcher)
-bash
+```bash
 cd ecowatcher
 # Pilih salah satu command berikut:
 npx expo start
 # atau
 npm start
-
+```
 
 ### Backend Server
-bash
+```bash
 cd ecowatcher/backend
 node server.js
-
+```
 
 ### Web Dashboard (Admin)
-bash
+```bash
 cd EcoWatcher-Web
 npm run dev
+```
 
+## 🏗️ Struktur Proyek
 
-## 📱 Struktur Proyek
-
-
+```
 ecowatcher/
 ├── app/
 │   └── config.ts          # Konfigurasi IP Address
@@ -79,7 +79,7 @@ ecowatcher/
 EcoWatcher-Web/
 ├── src/
 └── ...
-
+```
 
 ## 🔧 Konfigurasi
 
@@ -110,5 +110,6 @@ Pastikan untuk memperbarui IP Address sesuai dengan jaringan lokal Anda.
 
 Distributed under the MIT License. See LICENSE for more information.
 
+---
 
-Dibuat dengan ❤ untuk lingkungan yang lebih baik
+Dibuat dengan ❤️ untuk lingkungan yang lebih baik

@@ -21,6 +21,7 @@ import { useNavigation } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import CampaignDetailScreen from './CampaignDetailScreen';
 import CONFIG from '../config';
+import { db } from '../../firebaseConfig';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import MapView, { Marker, MapPressEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -59,14 +60,9 @@ const AdminDashboardScreen = () => {
   const [newKecamatan, setNewKecamatan] = useState('');
   const [newFee, setNewFee] = useState('');
   const [mapRegion, setMapRegion] = useState<any>(null);
-  // HAPUS: const [searchQuery, setSearchQuery] = useState('');
-  // HAPUS: const [searchResults, setSearchResults] = useState([]);
-  // HAPUS: const searchTimeout = useRef<number | null>(null);
-
-  // HAPUS: handleSearchChange, handleSelectResult
 
   useEffect(() => {
-    const q = query(collection(CONFIG.FIRESTORE_DB, 'campaigns'));
+    const q = query(collection(db, 'campaigns'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCampaigns(data);

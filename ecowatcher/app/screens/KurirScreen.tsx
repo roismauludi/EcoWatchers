@@ -6,7 +6,8 @@ import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from '../../utils/types';
-import { getAuth, signOut } from 'firebase/auth';
+import { auth } from '../../firebaseConfig';
+import { signOut } from 'firebase/auth'; // signOut tetap diimport dari firebase/auth karena tidak diekspor dari firebaseConfig.js
 import { SafeAreaView } from "react-native-safe-area-context";
 
 interface PenyetoranItem {
@@ -29,7 +30,6 @@ const KurirScreen = () => {
   const [trackData, setTrackData] = useState<TrackData>({});
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation<KurirScreenNavigationProp>();
-  const auth = getAuth(); // Firebase Authentication
 
   // Listener untuk koleksi 'Penyetoran' dengan urutan berdasarkan pickUpDate terbaru
   useEffect(() => {

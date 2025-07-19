@@ -34,6 +34,7 @@ const EcoPoinCard = () => {
     const fetchPoinData = async () => {
       const userEmail = await AsyncStorage.getItem("userEmail");
       if (userEmail) {
+        console.log('DEBUG DB EcoPoinCard:', db);
         const usersRef = collection(db, "users");
         const q = query(usersRef, where("email", "==", userEmail));
 

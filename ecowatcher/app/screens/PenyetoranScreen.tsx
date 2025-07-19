@@ -24,6 +24,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from '@react-navigation/native';
 import * as Analytics from 'expo-firebase-analytics';
+import { useSelectedItems } from '../../context/SelectedItemsContext';
 
 
 type RootStackParamList = {
@@ -65,6 +66,7 @@ const getImageSource = (imageName: string) => {
 export default function PenyetoranScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute();
+  const { setSelectedItems } = useSelectedItems();
 
   // State untuk kontrol modal dan tanggal yang dipilih
   const [modalVisible, setModalVisible] = useState(false);
@@ -289,6 +291,12 @@ export default function PenyetoranScreen() {
       const result = await response.json();
       if (response.ok) {
         await handleDeleteItems(items);
+        // Hapus dari state lokal SelectedItemsContext
+        setSelectedItems((prev) =>
+          prev.filter((item) =>
+            !items.some((deleted) => (deleted.id || deleted.itemId) === (item.id || item.id))
+          )
+        );
         Alert.alert("Sukses", "Penyetoran berhasil dikonfirmasi!");
         navigation.navigate("PickUp");
       } else {

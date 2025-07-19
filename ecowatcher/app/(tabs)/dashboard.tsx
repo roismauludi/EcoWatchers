@@ -13,7 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../utils/types";
-import { collection, query, where, getDocs, onSnapshot, collection as firestoreCollection } from "firebase/firestore";
+import { collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebaseConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import EcoPoinCard from "../../components/EcoPoinCard";
@@ -52,7 +52,7 @@ function Dashboard() {
   const [activeTab, setActiveTab] = useState<'ongoing' | 'ended'>('ongoing');
 
   useEffect(() => {
-    const unsub = onSnapshot(firestoreCollection(CONFIG.FIRESTORE_DB, 'campaigns'), (snapshot) => {
+    const unsub = onSnapshot(collection(db, 'campaigns'), (snapshot) => {
       const data = Array.isArray(snapshot.docs)
         ? snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(Boolean)
         : [];
@@ -80,6 +80,7 @@ function Dashboard() {
       }
 
       const usersRef = collection(db, "users");
+      console.log('DEBUG DB Dashboard:', db);
       const q = query(usersRef, where("email", "==", userEmail));
       const querySnapshot = await getDocs(q);
 

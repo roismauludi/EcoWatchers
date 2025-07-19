@@ -56,6 +56,7 @@ const TukarPointScreen = () => {
       const email = await AsyncStorage.getItem("userEmail");
       setUserEmail(email);
       if (email) {
+        console.log('DEBUG DB TukarPointScreen:', db);
         const usersRef = collection(db, "users");
         const q = query(usersRef, where("email", "==", email));
         const querySnapshot = await getDocs(q);

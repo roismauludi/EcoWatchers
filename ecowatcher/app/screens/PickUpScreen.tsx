@@ -10,23 +10,16 @@ import {
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { getAuth } from "firebase/auth";
+import { auth } from '../../firebaseConfig';
 import { RootStackParamList } from "../../utils/types";
-import {
-  getFirestore,
-  collection,
-  query,
-  where,
-  onSnapshot,
-} from "firebase/firestore";
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../../firebaseConfig';
 import { Ionicons } from "@expo/vector-icons";
 import SelesaiScreen from "./SelesaiScreen";
 import DibatalkanScreen from "./DibatalkanScreen";
 import DijemputScreen from "./DijemputScreen";
 import CONFIG from "../config";
 import searchingImage from "../../assets/images/pickup/searching.png";
-
-const db = getFirestore();
 
 interface PickupItem {
   itemId: string;
@@ -71,10 +64,11 @@ export default function PickUpScreen() {
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   useEffect(() => {
-    const user = getAuth().currentUser;
+    const user = auth.currentUser;
     if (user) {
       const userId = user.uid;
       const collectionRef = collection(db, "Penyetoran");
+      console.log('DEBUG DB PickUpScreen:', db);
       const q = query(collectionRef, where("userId", "==", userId));
 
       const unsubscribe = onSnapshot(q, (snapshot) => {
