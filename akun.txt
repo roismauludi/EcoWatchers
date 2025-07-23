@@ -1,0 +1,2 @@
+akun kurir : kurir@gmail.com password: kurir123
+akun admin : admin@gmail.com password: admin1234

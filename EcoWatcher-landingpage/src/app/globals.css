@@ -1,0 +1,197 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.portfolio-container {
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 32px 24px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  color: #222;
+}
+
+.portfolio-header {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  margin-bottom: 16px;
+}
+
+.portfolio-photo {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #e0e0e0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.portfolio-title {
+  margin: 0;
+  color: #1976d2;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.portfolio-subtitle {
+  margin: 8px 0 0 0;
+  font-size: 1.25rem;
+  color: #555;
+  font-weight: 500;
+}
+
+.portfolio-contact {
+  margin-top: 10px;
+  font-size: 1rem;
+  color: #444;
+}
+
+.portfolio-contact a {
+  color: #1976d2;
+  text-decoration: underline;
+}
+
+.portfolio-divider {
+  margin: 32px 0;
+  border: none;
+  border-top: 1.5px solid #e0e0e0;
+}
+
+.portfolio-section-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #1976d2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.portfolio-text {
+  font-size: 1rem;
+  color: #222;
+  margin-bottom: 18px;
+}
+
+.portfolio-list {
+  padding-left: 18px;
+  margin-bottom: 18px;
+  color: #222;
+  font-size: 1rem;
+}
+
+.portfolio-list-numbered {
+  padding-left: 22px;
+  margin-bottom: 18px;
+  color: #222;
+  font-size: 1rem;
+}
+
+.project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin-bottom: 18px;
+}
+
+.project-card {
+  background: #f8fafc;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  padding: 18px 20px 14px 20px;
+  border-left: 5px solid #1976d2;
+  transition: box-shadow 0.2s;
+}
+
+.project-card:hover {
+  box-shadow: 0 4px 16px rgba(25, 118, 210, 0.10);
+}
+
+.project-title {
+  font-size: 1.13rem;
+  font-weight: 700;
+  color: #1a237e;
+  margin-bottom: 2px;
+}
+
+.project-label {
+  font-weight: 600;
+  color: #1976d2;
+  margin-right: 4px;
+}
+
+.project-detail {
+  margin-bottom: 2px;
+  color: #222;
+  font-size: 1rem;
+}
+
+@keyframes gradientMove {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradientMove 10s ease-in-out infinite;
+}
+
+.drop-shadow-lg {
+  text-shadow: 0 4px 16px rgba(0,0,0,0.25), 0 1.5px 2px rgba(0,0,0,0.18);
+}
+
+@media (max-width: 600px) {
+  .portfolio-container {
+    padding: 12px 4vw;
+  }
+  .portfolio-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .portfolio-photo {
+    width: 90px;
+    height: 90px;
+  }
+  .portfolio-title {
+    font-size: 1.3rem;
+  }
+  .project-card {
+    padding: 12px 8px 10px 12px;
+  }
+  .project-title {
+    font-size: 1rem;
+  }
+}

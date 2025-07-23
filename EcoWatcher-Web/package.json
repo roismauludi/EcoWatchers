@@ -1,0 +1,43 @@
+{
+  "$schema": "https://raw.githubusercontent.com/SchemaStore/schemastore/master/src/schemas/json/package.json",
+  "name": "windmill-dashboard-nextjs-typescript",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "set NODE_OPTIONS=--openssl-legacy-provider && next dev",
+    "build": "set NODE_OPTIONS=--openssl-legacy-provider && next build",
+    "start": "set NODE_OPTIONS=--openssl-legacy-provider && next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@heroicons/react": "^2.2.0",
+    "@types/js-cookie": "^3.0.6",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@vercel/analytics": "^1.5.0",
+    "@windmill/react-ui": "^0.6.0",
+    "autoprefixer": "^10.4.2",
+    "chart.js": "^4.4.1",
+    "classnames": "^2.3.1",
+    "cookie": "^1.0.2",
+    "firebase": "^11.1.0",
+    "js-cookie": "^3.0.5",
+    "jsonwebtoken": "^9.0.2",
+    "next": "^13.0.0",
+    "postcss": "^8.4.6",
+    "react": "^18.0.0",
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^18.0.0",
+    "react-icons": "^5.5.0",
+    "tailwindcss": "^2.2.19"
+  },
+  "devDependencies": {
+    "@svgr/webpack": "^6.1.0",
+    "@types/chart.js": "^2.9.41",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "cssnano": "^5.0.12",
+    "eslint": "7.32.0",
+    "eslint-config-next": "11.1.2",
+    "typescript": "^5.0.0"
+  }
+}
