@@ -207,9 +207,9 @@ const LandingPage = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 justify-items-center">
             {/* Anggota 1 */}
             <div className="flex flex-col justify-between items-center bg-white rounded-xl shadow-lg p-6 w-full max-w-xs min-h-[320px] h-full">
-              <button type="button" onClick={() => openPreview("/assets/img/bagas1.jpg", "Bagas Satria Bimantara")}
+              <button type="button" onClick={() => openPreview("/assets/img/bagas.jpg", "Bagas Satria Bimantara")}
                 className="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center mb-4 overflow-hidden focus:outline-none focus:ring-2 focus:ring-green-400">
-                <Image src="/assets/img/bagas1.jpg" alt="Bagas Satria Bimantara" width={128} height={128} className="object-cover w-32 h-32 rounded-full" />
+                <Image src="/assets/img/bagas.jpg" alt="Bagas Satria Bimantara" width={128} height={128} className="object-cover w-32 h-32 rounded-full" />
               </button>
               <div className="font-bold text-lg text-gray-800 mb-1 min-h-[48px] flex items-center justify-center text-center">
                 Bagas Satria Bimantara
